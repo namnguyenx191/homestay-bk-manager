@@ -1,0 +1,40 @@
+{
+  "name": "backend",
+  "version": "1.0.0",
+  "description": "",
+  "main": "src/server.js",
+  "scripts": {
+    "dev": "nodemon src/server.js",
+    "start": "node src/server.js",
+    "seed:users": "node src/seed/seedUsers.js",
+    "seed:host-homestays": "node src/seed/seedHostHomestays.js",
+    "seed:extra-host-test": "node src/seed/seedExtraHostTestData.js",
+    "seed:add-on-services": "node src/seed/seedAddOnServices.js",
+    "seed:homestay-images": "node src/seed/seedHomestayImages.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "bcryptjs": "^3.0.3",
+    "bullmq": "^5.74.1",
+    "cloudinary": "^2.9.0",
+    "cookie-parser": "^1.4.7",
+    "cors": "^2.8.6",
+    "dotenv": "^17.4.2",
+    "express": "^5.2.1",
+    "express-validator": "^7.3.2",
+    "ioredis": "^5.10.1",
+    "jsonwebtoken": "^9.0.3",
+    "mongoose": "^9.4.1",
+    "morgan": "^1.10.1",
+    "multer": "^2.1.1",
+    "nodemailer": "^8.0.5",
+    "socket.io": "^4.8.3",
+    "stripe": "^22.0.1"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.14"
+  }
+}
