@@ -1,20 +1,13 @@
 import axios from 'axios';
+import { getApiBaseForClient } from '../config/apiBase';
 
-const normalizeApiBase = (value) => String(value || '').replace(/\/+$/, '');
-
-const envApi = normalizeApiBase(import.meta.env.VITE_API_URL);
-const primaryBase =
-  envApi ||
-  (import.meta.env.DEV ? '/api' : 'http://localhost:5050/api');
+const primaryBase = getApiBaseForClient();
+const devPort = import.meta.env.VITE_BACKEND_PORT || '5050';
 
 const fallbackBase =
-  primaryBase === '/api'
-    ? 'http://127.0.0.1:5050/api'
-    : primaryBase.includes(':5050')
-      ? 'http://127.0.0.1:5000/api'
-      : primaryBase.includes(':5000')
-        ? 'http://127.0.0.1:5050/api'
-        : null;
+  import.meta.env.DEV && primaryBase === '/api'
+    ? `http://127.0.0.1:${devPort}/api`
+    : null;
 
 const client = axios.create({
   baseURL: primaryBase,

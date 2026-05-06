@@ -20,10 +20,18 @@ const { stripeWebhook } = require('./controllers/bookingController');
 
 const app = express();
 
-const allowedOrigins = (process.env.CLIENT_URLS || process.env.CLIENT_URL || 'http://localhost:5173,http://localhost:5174')
-  .split(',')
-  .map((origin) => origin.trim())
-  .filter(Boolean);
+const allowedOrigins = [
+  ...new Set([
+    ...(process.env.CLIENT_URLS || process.env.CLIENT_URL || 'http://localhost:5173,http://localhost:5174')
+      .split(',')
+      .map((origin) => origin.trim())
+      .filter(Boolean),
+    ...(process.env.EXTRA_CORS_ORIGINS || '')
+      .split(',')
+      .map((origin) => origin.trim())
+      .filter(Boolean),
+  ]),
+];
 const isLocalhostOrigin = (origin) =>
   /^https?:\/\/(localhost|127\.0\.0\.1):\d+$/.test(origin);
 const isNonProd = process.env.NODE_ENV !== 'production';
