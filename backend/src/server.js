@@ -11,6 +11,7 @@ const connectDB = require('./config/db');
 const { initSocket } = require('./utils/socket');
 const { bootNotificationWorker } = require('./services/notificationQueue');
 const { startOverstayCheckoutScheduler } = require('./services/overstayCheckoutJob');
+const { startBankMailBot } = require('./services/bankMailBot');
 
 const PORT = process.env.PORT || 5000;
 
@@ -31,6 +32,7 @@ process.on('uncaughtException', (err) => {
     server.listen(PORT, () => {
       console.log(`Server running on port ${PORT}`);
       startOverstayCheckoutScheduler();
+      startBankMailBot();
     });
   } catch (err) {
     console.error('[server] Startup failed:', err && err.stack ? err.stack : err);
