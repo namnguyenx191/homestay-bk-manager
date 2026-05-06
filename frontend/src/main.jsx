@@ -8,6 +8,13 @@ import { LanguageProvider } from './context/LanguageContext';
 import { CurrencyProvider } from './context/CurrencyContext';
 import './index.css';
 
+if (import.meta.env.PROD && !import.meta.env.VITE_API_URL) {
+  // eslint-disable-next-line no-console
+  console.error(
+    '[homestay] Missing VITE_API_URL in this build. Add it in Vercel → Settings → Environment Variables, then Redeploy.'
+  );
+}
+
 createRoot(document.getElementById('root')).render(
   <StrictMode>
     <BrowserRouter>

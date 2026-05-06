@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
+import { parseApiError } from '../utils/formatApiError';
 
 const RegisterPage = () => {
   const { register } = useAuth();
@@ -18,9 +19,23 @@ const RegisterPage = () => {
       await register(form);
       navigate('/');
     } catch (error) {
-      const data = error.response?.data || {};
-      const validatorMsg = Array.isArray(data.errors) ? data.errors.find((e) => e?.msg)?.msg : '';
-      const text = data.message || validatorMsg || tv('Register failed. Please try again.', 'Đăng ký thất bại. Vui lòng thử lại.');
+      const parsed = parseApiError(error);
+      let text;
+      if (parsed?.code === 'NETWORK') {
+        text = tv(
+          'Cannot reach the API. Use the main Vercel URL, set VITE_API_URL / VITE_SOCKET_URL on Vercel, Redeploy, and ensure Render CLIENT_URLS matches your site.',
+          'Không kết nối được máy chủ API. Hãy: mở đúng link Vercel đã cấu hình trên Render; trong Vercel đặt VITE_API_URL và VITE_SOCKET_URL rồi Redeploy; kiểm tra Render CLIENT_URLS trùng URL web.'
+        );
+      } else if (parsed?.code === 'HTML_RESPONSE') {
+        text = tv(
+          'Wrong API URL (received HTML). Set VITE_API_URL=https://homestay-api-bh1a.onrender.com/api on Vercel and redeploy.',
+          'Sai địa chỉ API (nhận HTML thay vì JSON). Trên Vercel đặt VITE_API_URL=https://homestay-api-bh1a.onrender.com/api và Redeploy.'
+        );
+      } else {
+        text =
+          parsed?.message ||
+          tv('Register failed. Please try again.', 'Đăng ký thất bại. Vui lòng thử lại.');
+      }
       toast.error(text);
     } finally {
       setLoading(false);

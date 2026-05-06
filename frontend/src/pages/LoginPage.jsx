@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
+import { parseApiError } from '../utils/formatApiError';
 
 const LoginPage = () => {
   const { user, loading: authLoading, login } = useAuth();
@@ -34,10 +35,24 @@ const LoginPage = () => {
         navigate('/', { replace: true });
       }
     } catch (error) {
-      const serverMessage = error.response?.data?.message;
-      const status = error.response?.status;
-      const fallback = error.message || tv('Unknown error', 'Lỗi không xác định');
-      const detail = serverMessage ? `${serverMessage}${status ? ` (HTTP ${status})` : ''}` : fallback;
+      const parsed = parseApiError(error);
+      let detail;
+      if (parsed?.code === 'NETWORK') {
+        detail = tv(
+          'Cannot reach the API. Check VITE_API_URL on Vercel and CLIENT_URLS on Render.',
+          'Không kết nối được API. Kiểm tra VITE_API_URL trên Vercel và CLIENT_URLS trên Render.'
+        );
+      } else if (parsed?.code === 'HTML_RESPONSE') {
+        detail = tv(
+          'Wrong API URL. Redeploy frontend with correct VITE_API_URL.',
+          'Sai địa chỉ API. Redeploy frontend với VITE_API_URL đúng.'
+        );
+      } else {
+        detail =
+          parsed?.message ||
+          error.message ||
+          tv('Unknown error', 'Lỗi không xác định');
+      }
       setErrorText(detail);
       toast.error(detail);
     } finally {
