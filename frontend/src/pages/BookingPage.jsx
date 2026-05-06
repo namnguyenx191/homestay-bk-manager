@@ -17,10 +17,12 @@ const BookingPage = () => {
     checkOutDate: location.state?.prefilledCheckOut || '',
   });
   const [paymentMethod, setPaymentMethod] = useState('card');
-  const [cardEntryMode, setCardEntryMode] = useState('inline');
-  const [bankNote, setBankNote] = useState('');
   const [loading, setLoading] = useState(false);
   const [bankTransferResult, setBankTransferResult] = useState(null);
+  const [dynamicQrResult, setDynamicQrResult] = useState(null);
+  const [dynamicQrLoading, setDynamicQrLoading] = useState(false);
+  const [dynamicQrError, setDynamicQrError] = useState('');
+  const [qrPanelOpen, setQrPanelOpen] = useState(false);
   const [bankInfoPreview, setBankInfoPreview] = useState(null);
   const [payCaps, setPayCaps] = useState(undefined);
   const [stripeStep, setStripeStep] = useState(null);
@@ -34,10 +36,14 @@ const BookingPage = () => {
   });
   const { tv } = useLanguage();
   const { formatMoney } = useCurrency();
+  const formatVndRaw = (v) =>
+    new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND', maximumFractionDigits: 0 }).format(
+      Number(v || 0)
+    );
 
-  const cardCheckoutBlocked = paymentMethod === 'card' && cardEntryMode === 'checkout' && payCaps && !payCaps.cardCheckoutAvailable;
-  const cardInlineBlocked = paymentMethod === 'card' && cardEntryMode === 'inline' && payCaps && !payCaps.cardInlineAvailable;
+  const cardInlineBlocked = paymentMethod === 'card' && payCaps && !payCaps.cardInlineAvailable;
   const isDevCardFallback = payCaps?.cardMode === 'dev_fallback';
+  const stripeModeMismatch = Boolean(payCaps?.stripeModeMismatch);
 
   const nights = useMemo(() => {
     if (!form.checkInDate || !form.checkOutDate) return 0;
@@ -75,15 +81,6 @@ const BookingPage = () => {
       if (pm !== 'card') return pm;
       if (payCaps.cardCheckoutAvailable || payCaps.cardInlineAvailable) return pm;
       return 'bank_transfer';
-    });
-  }, [payCaps]);
-
-  useEffect(() => {
-    if (!payCaps) return;
-    setCardEntryMode((mode) => {
-      if (mode === 'checkout' && !payCaps.cardCheckoutAvailable && payCaps.cardInlineAvailable) return 'inline';
-      if (mode === 'inline' && !payCaps.cardInlineAvailable && payCaps.cardCheckoutAvailable) return 'checkout';
-      return mode;
     });
   }, [payCaps]);
 
@@ -127,13 +124,11 @@ const BookingPage = () => {
     }
     setLoading(true);
     setBankTransferResult(null);
+    setDynamicQrResult(null);
+    setDynamicQrError('');
+    setQrPanelOpen(false);
     setStripeStep(null);
-    const requestCardMode =
-      paymentMethod === 'card'
-        ? cardEntryMode === 'inline' && payCaps?.cardInlineAvailable === false && payCaps?.cardCheckoutAvailable
-          ? 'checkout'
-          : cardEntryMode
-        : undefined;
+    const requestCardMode = paymentMethod === 'card' ? 'inline' : undefined;
     try {
       const { data } = await client.post('/bookings', {
         homestayId: id,
@@ -141,7 +136,6 @@ const BookingPage = () => {
         checkOutDate: form.checkOutDate,
         paymentMethod,
         cardEntryMode: requestCardMode,
-        bankTransferNote: paymentMethod === 'bank_transfer' ? bankNote : undefined,
         selectedAddOns: Object.entries(selectedAddOns)
           .map(([serviceName, quantity]) => ({ serviceName, quantity: Number(quantity || 0) }))
           .filter((item) => item.quantity > 0),
@@ -164,8 +158,14 @@ const BookingPage = () => {
       }
 
       if (data.bankTransfer) {
-        setBankTransferResult(data.bankTransfer);
+        const payload = {
+          ...data.bankTransfer,
+          bookingId: data.booking?._id || '',
+          bookingTotalPrice: Number(data.booking?.totalPrice || 0),
+        };
+        setBankTransferResult(payload);
         toast.success(tv('Booking created. Complete the bank transfer using the details below.', 'Đã tạo đơn. Hoàn tất chuyển khoản theo thông tin bên dưới.'));
+        if (payload.bookingId) createDynamicQr(payload.bookingId, { openPanel: true });
         return;
       }
 
@@ -173,14 +173,44 @@ const BookingPage = () => {
       navigate('/dashboard');
     } catch (error) {
       const serverMsg = error.response?.data?.message || '';
-      if (paymentMethod === 'card' && requestCardMode === 'inline' && payCaps?.cardCheckoutAvailable) {
-        setCardEntryMode('checkout');
-        toast.error(tv('Inline card form is unavailable, switched to Stripe Checkout.', 'Form nhập thẻ trực tiếp chưa sẵn sàng, đã chuyển sang Stripe Checkout.'));
-      } else {
-        toast.error(serverMsg || tv('Cannot create booking', 'Không thể tạo đơn đặt chỗ'));
-      }
+      toast.error(serverMsg || tv('Cannot create booking', 'Không thể tạo đơn đặt chỗ'));
     } finally {
       setLoading(false);
+    }
+  };
+
+  const createDynamicQr = async (bookingId, options = {}) => {
+    if (!bookingId) return;
+    setDynamicQrLoading(true);
+    setDynamicQrResult(null);
+    setDynamicQrError('');
+    if (options.openPanel) setQrPanelOpen(true);
+    try {
+      let data = null;
+      const vietQrRes = await client.post('/bookings/vietqr', { bookingId, scope: 'booking' });
+      data = { ...vietQrRes.data, provider: 'vietqr' };
+      if (!data?.qrCodeUrl) {
+        throw new Error(tv('QR provider returned no image.', 'Nhà cung cấp QR không trả về ảnh.'));
+      }
+      setDynamicQrResult(data);
+      toast.success(tv('Dynamic VietQR created.', 'Đã tạo VietQR động.'));
+    } catch (error) {
+      const fallbackStaticQr = bankTransferResult?.bankQrImageUrl
+        ? resolveAssetUrl(bankTransferResult.bankQrImageUrl)
+        : '';
+      if (fallbackStaticQr) {
+        setDynamicQrResult({
+          provider: 'uploaded_static',
+          qrCodeUrl: fallbackStaticQr,
+        });
+        setDynamicQrError(tv('Dynamic QR is unavailable, showing uploaded QR.', 'QR động chưa khả dụng, đang hiển thị QR đã tải lên.'));
+      } else {
+        const msg = error.response?.data?.message || tv('Could not create payment QR', 'Không thể tạo QR thanh toán');
+        setDynamicQrError(msg);
+        toast.error(msg);
+      }
+    } finally {
+      setDynamicQrLoading(false);
     }
   };
 
@@ -351,36 +381,25 @@ const BookingPage = () => {
                         />
                       </div>
                     )}
-                    {cardCheckoutBlocked && (
-                      <p className="rounded border border-amber-200 bg-amber-50 px-2 py-1.5 text-xs text-amber-900">
-                        {tv('Stripe Checkout is not configured. Add ' ,'Stripe Checkout chưa được cấu hình. Thêm ' )}<code className="rounded bg-white px-0.5">STRIPE_SECRET_KEY</code> to{' '}
-                        <code className="rounded bg-white px-0.5">backend/.env</code> {tv('and restart the API, or choose bank transfer.', 'rồi khởi động lại API, hoặc chọn chuyển khoản ngân hàng.')}
-                      </p>
-                    )}
                     {cardInlineBlocked && (
                       <p className="rounded border border-amber-200 bg-amber-50 px-2 py-1.5 text-xs text-amber-900">
-                        {tv('Pay on this page needs both ' , 'Thanh toán tại trang này cần cả ' )}<code className="rounded bg-white px-0.5">STRIPE_SECRET_KEY</code> and{' '}
-                        <code className="rounded bg-white px-0.5">STRIPE_PUBLISHABLE_KEY</code> {tv('in', 'trong')} <code className="rounded bg-white px-0.5">backend/.env</code>{tv(', or use Checkout / bank transfer.', ', hoặc dùng Checkout / chuyển khoản.')}
+                        {stripeModeMismatch
+                          ? tv(
+                            'Stripe keys are mixed test/live. Please use matching STRIPE_SECRET_KEY + STRIPE_PUBLISHABLE_KEY.',
+                            'Stripe đang trộn key test/live. Hãy dùng cặp STRIPE_SECRET_KEY + STRIPE_PUBLISHABLE_KEY cùng mode.'
+                          )
+                          : tv('Pay on this page needs both ' , 'Thanh toán tại trang này cần cả ' )}
+                        {!stripeModeMismatch && (
+                          <>
+                            <code className="rounded bg-white px-0.5">STRIPE_SECRET_KEY</code> and{' '}
+                            <code className="rounded bg-white px-0.5">STRIPE_PUBLISHABLE_KEY</code> {tv('in', 'trong')} <code className="rounded bg-white px-0.5">backend/.env</code>.
+                          </>
+                        )}
                       </p>
                     )}
-                    <label className="flex items-center gap-2 text-sm">
-                      <input
-                        type="radio"
-                        name="cardMode"
-                        checked={cardEntryMode === 'inline'}
-                        onChange={() => setCardEntryMode('inline')}
-                      />
-                      {tv('Enter card on this page (Stripe Elements)', 'Nhập thẻ tại trang này (Stripe Elements)')}
-                    </label>
-                    <label className="flex items-center gap-2 text-sm">
-                      <input
-                        type="radio"
-                        name="cardMode"
-                        checked={cardEntryMode === 'checkout'}
-                        onChange={() => setCardEntryMode('checkout')}
-                      />
-                      {tv('Redirect to Stripe Checkout page', 'Chuyển tới trang Stripe Checkout')}
-                    </label>
+                    <p className="text-xs text-slate-600">
+                      {tv('Card form will open right after you continue.', 'Form nhập thẻ sẽ tự hiện ngay sau khi bạn bấm tiếp tục.')}
+                    </p>
                   </div>
                 )}
               </div>
@@ -396,7 +415,10 @@ const BookingPage = () => {
               <div className="flex-1">
                 <p className="font-medium">{tv('Bank transfer', 'Chuyển khoản ngân hàng')}</p>
                 <p className="text-xs text-slate-600">
-                  {tv('If the host uploaded a QR, it appears below. After you submit, you also get the transfer reference and full account details.', 'Nếu chủ nhà đã tải QR, mã sẽ hiện bên dưới. Sau khi tạo đơn, bạn sẽ nhận mã chuyển khoản và đầy đủ thông tin tài khoản.')}
+                  {tv(
+                    'After creating the booking, the system auto-generates VietQR with exact amount and transfer reference.',
+                    'Sau khi tạo đơn, hệ thống tự tạo VietQR với đúng số tiền và mã chuyển khoản.'
+                  )}
                 </p>
               </div>
             </label>
@@ -408,43 +430,47 @@ const BookingPage = () => {
               {bankInfoPreview.accountNumber ? ` · ****${String(bankInfoPreview.accountNumber).slice(-4)}` : ''}
             </p>
           )}
-          {paymentMethod === 'bank_transfer' && bankInfoPreview?.bankQrImageUrl && (
-            <div className="rounded border bg-white p-3 text-center">
-              <p className="mb-2 text-xs font-semibold text-slate-600">{tv('Scan QR to pay', 'Quét QR để thanh toán')}</p>
-              <img
-                src={resolveAssetUrl(bankInfoPreview.bankQrImageUrl)}
-                alt={tv('Bank transfer QR', 'QR chuyển khoản ngân hàng')}
-                className="mx-auto max-h-64 max-w-full object-contain"
-              />
-              <p className="mt-2 text-xs text-slate-500">
-                After you create the booking, account number and your transfer reference appear {tv('in', 'trong')} the summary below.
-              </p>
+          {paymentMethod === 'bank_transfer' && (
+            <div
+              className={`rounded border p-3 text-xs ${
+                payCaps?.vietQrAvailable
+                  ? 'border-pink-200 bg-pink-50 text-pink-900'
+                  : 'border-amber-200 bg-amber-50 text-amber-900'
+              }`}
+            >
+              <p className="font-semibold">{tv('Dynamic QR (VietQR/MoMo)', 'QR động (VietQR/MoMo)')}</p>
+              {payCaps?.vietQrAvailable ? (
+                <p>
+                  {tv(
+                    'After creating the booking, tap "Show payment QR" to generate dynamic VietQR with exact amount and transfer reference.',
+                    'Sau khi tạo đơn, bấm "Hiện QR thanh toán" để tạo VietQR động với đúng số tiền và mã chuyển khoản.'
+                  )}
+                </p>
+              ) : (
+                <p>
+                  {tv(
+                    'Dynamic provider is not configured on server yet. Please use bank transfer details below.',
+                    'Nhà cung cấp QR động chưa được cấu hình trên server. Vui lòng dùng thông tin chuyển khoản bên dưới.'
+                  )}
+                </p>
+              )}
             </div>
           )}
-          {paymentMethod === 'bank_transfer' && bankInfoPreview && !bankInfoPreview.bankQrImageUrl && (
+          {paymentMethod === 'bank_transfer' && (
             <p className="text-xs text-slate-500">
-              {tv('No QR image from the host yet; you can still transfer using the details shown after you create the booking.', 'Chủ nhà chưa có ảnh QR; bạn vẫn có thể chuyển khoản bằng thông tin hiển thị sau khi tạo đơn.')}
+              {tv(
+                'VietQR mini page will open automatically after creating the booking.',
+                'Mini page VietQR sẽ tự bật sau khi tạo đơn.'
+              )}
             </p>
           )}
 
-          {paymentMethod === 'bank_transfer' && (
-            <div>
-              <label className="text-xs font-semibold uppercase text-slate-500">{tv('Transfer note (optional)', 'Nội dung chuyển khoản (tuỳ chọn)')}</label>
-              <input
-                value={bankNote}
-                onChange={(e) => setBankNote(e.target.value)}
-                placeholder={tv('e.g. Sender name', 'VD: Tên người chuyển')}
-                className="mt-1 w-full rounded border p-2 text-sm"
-                maxLength={500}
-              />
-            </div>
-          )}
 
           <button
-            disabled={loading || !nights || cardCheckoutBlocked || cardInlineBlocked}
+            disabled={loading || !nights || cardInlineBlocked}
             className="w-full rounded bg-emerald-600 p-2 text-white disabled:opacity-60"
           >
-            {loading ? tv('Processing...', 'Đang xử lý...') : paymentMethod === 'card' ? tv('Continue to card form', 'Tiếp tục tới form thẻ') : tv('Create booking and transfer info', 'Tạo đơn và nhận thông tin chuyển khoản')}
+            {loading ? tv('Processing...', 'Đang xử lý...') : paymentMethod === 'card' ? tv('Pay by card', 'Thanh toán bằng thẻ') : tv('Create booking and transfer info', 'Tạo đơn và nhận thông tin chuyển khoản')}
           </button>
         </form>
       )}
@@ -513,6 +539,28 @@ const BookingPage = () => {
             </div>
           </div>
           <p className="text-xs text-slate-600">{bankTransferResult.instructions}</p>
+          {dynamicQrResult?.qrCodeUrl && (
+            <div className="rounded-lg border border-pink-200 bg-white p-3 text-center">
+              <p className="mb-2 text-xs font-semibold text-pink-700">
+                {tv('Scan QR to pay (bank app or MoMo)', 'Quét QR để thanh toán (app ngân hàng hoặc MoMo)')}
+              </p>
+              <img
+                src={dynamicQrResult.qrCodeUrl}
+                alt={tv('Dynamic payment QR', 'QR thanh toán động')}
+                className="mx-auto h-56 w-56 rounded object-contain"
+              />
+              {dynamicQrResult.payUrl && (
+                <a
+                  href={dynamicQrResult.payUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="mt-2 inline-block text-xs font-semibold text-pink-700 hover:underline"
+                >
+                  {tv('Open payment link', 'Mở link thanh toán')}
+                </a>
+              )}
+            </div>
+          )}
           <button
             type="button"
             onClick={() => navigate('/dashboard')}
@@ -520,6 +568,98 @@ const BookingPage = () => {
           >
             My bookings
           </button>
+        </div>
+      )}
+
+      {qrPanelOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 p-4">
+          <div className="w-full max-w-md rounded-2xl bg-white p-5 shadow-2xl">
+            <div className="mb-3 flex items-start justify-between">
+              <div>
+                <h3 className="text-lg font-bold tracking-tight text-slate-900">
+                  {tv('Payment QR', 'QR thanh toán')}
+                </h3>
+                <p className="text-xs text-slate-500">
+                  {tv('Scan by banking app or MoMo', 'Quét bằng app ngân hàng hoặc MoMo')}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setQrPanelOpen(false)}
+                className="rounded border px-2 py-1 text-xs font-semibold text-slate-600 hover:bg-slate-50"
+              >
+                {tv('Close', 'Đóng')}
+              </button>
+            </div>
+
+            <div className="rounded-lg border bg-slate-50 p-3 text-sm">
+              <p>
+                <span className="text-slate-500">{tv('Amount', 'Số tiền')}:</span>{' '}
+                <strong className="text-slate-900">
+                  {dynamicQrResult?.qrAmountVnd
+                    ? formatVndRaw(dynamicQrResult.qrAmountVnd)
+                    : formatMoney(Number(dynamicQrResult?.amount || bankTransferResult?.bookingTotalPrice || total || 0))}
+                </strong>
+              </p>
+              <p className="mt-1">
+                <span className="text-slate-500">{tv('Reference', 'Mã CK')}:</span>{' '}
+                <strong className="select-all text-emerald-700">{bankTransferResult?.reference || '—'}</strong>
+              </p>
+            </div>
+
+            <div className="mt-3 rounded-xl border bg-white p-3 text-center">
+              {!dynamicQrLoading && dynamicQrResult?.qrCodeUrl && (
+                <>
+                  <p className="mb-2 text-xs font-semibold text-slate-700">
+                    {dynamicQrResult.provider === 'vietqr'
+                      ? tv('Dynamic VietQR', 'VietQR động')
+                      : tv('Uploaded static QR', 'QR tĩnh đã tải lên')}
+                  </p>
+                  <img
+                    src={dynamicQrResult.qrCodeUrl}
+                    alt={tv('Payment QR', 'QR thanh toán')}
+                    className="mx-auto h-64 w-64 rounded-lg object-contain"
+                  />
+                </>
+              )}
+              {dynamicQrLoading && (
+                <p className="py-20 text-sm font-semibold text-slate-600">
+                  {tv('Generating QR...', 'Đang tạo QR...')}
+                </p>
+              )}
+              {!dynamicQrLoading && !dynamicQrResult?.qrCodeUrl && (
+                <p className="py-16 text-sm text-rose-600">{dynamicQrError || tv('QR unavailable', 'QR chưa khả dụng')}</p>
+              )}
+            </div>
+
+            {dynamicQrError && (
+              <p className="mt-2 text-xs text-amber-700">{dynamicQrError}</p>
+            )}
+
+            <div className="mt-4 grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() =>
+                  copyText(
+                    bankTransferResult?.reference,
+                    tv('Reference copied', 'Đã copy mã CK'),
+                    tv('Copy failed', 'Copy thất bại')
+                  )
+                }
+                className="rounded border border-slate-300 py-2 text-sm font-semibold text-slate-700"
+              >
+                {tv('Copy reference', 'Copy mã CK')}
+              </button>
+              <button
+                type="button"
+                onClick={() => createDynamicQr(bankTransferResult?.bookingId || bankTransferResult?.booking?._id)}
+                disabled={dynamicQrLoading}
+                className="rounded bg-pink-600 py-2 text-sm font-semibold text-white disabled:opacity-60"
+              >
+                {tv('Refresh QR', 'Làm mới QR')}
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

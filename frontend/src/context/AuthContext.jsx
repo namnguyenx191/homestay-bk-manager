@@ -36,6 +36,7 @@ export const AuthProvider = ({ children }) => {
     localStorage.setItem('token', data.token);
     setUser(data.user);
     toast.success(tv('Login successful', 'Đăng nhập thành công'));
+    return data.user;
   };
 
   const register = async (payload) => {

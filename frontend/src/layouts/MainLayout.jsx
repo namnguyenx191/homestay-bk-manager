@@ -1,29 +1,67 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, NavLink } from 'react-router-dom';
-import { UserRound } from 'lucide-react';
+import { Languages, UserRound } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
-import { useCurrency } from '../context/CurrencyContext';
 import SiteFooter from '../components/SiteFooter';
 import AnimatedBackground from '../components/AnimatedBackground';
+import { getSocket } from '../utils/socket';
+import toast from 'react-hot-toast';
 
 const navPill = ({ isActive }) =>
   `relative px-3 py-2 text-sm font-semibold tracking-wide transition after:absolute after:bottom-0 after:left-0 after:h-[2px] after:w-full after:bg-white after:transition-opacity ${
     isActive
       ? 'text-white after:opacity-100'
-      : 'text-white/80 hover:text-white after:opacity-0 hover:after:opacity-70'
+      : 'text-slate-100 hover:text-white after:opacity-0 hover:after:opacity-70'
   }`;
 
 const accountMenuLink =
-  'block rounded-lg px-3 py-2.5 text-sm font-medium text-white/95 transition hover:bg-white/12';
+  'block rounded-lg px-3 py-2.5 text-sm font-medium text-white transition hover:bg-white/12';
+const langMenuBtn = (active) =>
+  `flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-xs font-semibold transition ${
+    active ? 'bg-white/20 text-white' : 'text-white/90 hover:bg-white/10'
+  }`;
 
 const MainLayout = ({ children }) => {
   const { user, logout } = useAuth();
   const { lang, changeLanguage, t } = useLanguage();
-  const { currency, setCurrency } = useCurrency();
   const [accountMenuOpen, setAccountMenuOpen] = useState(false);
+  const [langMenuOpen, setLangMenuOpen] = useState(false);
+  const isHostOnly = user?.role === 'host';
   const listPropertyPath =
     user?.role === 'admin' ? '/admin?tab=listings' : user?.role === 'host' ? '/host?section=listings' : '/search';
+
+  useEffect(() => {
+    if (!user?._id) return undefined;
+    const socket = getSocket();
+    socket.emit('join:user', user._id);
+    const onUserNotification = (payload) => {
+      if (!payload?.message) return;
+      toast(payload.message, { duration: 8000, icon: '⚠️' });
+    };
+    socket.on('user:notification', onUserNotification);
+    return () => socket.off('user:notification', onUserNotification);
+  }, [user?._id]);
+
+  useEffect(() => {
+    if (!langMenuOpen) return undefined;
+    const onDocClick = () => setLangMenuOpen(false);
+    document.addEventListener('click', onDocClick);
+    return () => document.removeEventListener('click', onDocClick);
+  }, [langMenuOpen]);
+
+  useEffect(() => {
+    if (typeof document === 'undefined') return;
+    document.documentElement.lang = lang === 'vi' ? 'vi' : lang === 'zh' ? 'zh' : lang === 'ko' ? 'ko' : 'en';
+    document.title =
+      lang === 'vi'
+        ? 'HomeStay Đặt phòng & Quản lý'
+        : lang === 'zh'
+          ? 'HomeStay 预订与管理'
+          : lang === 'ko'
+            ? 'HomeStay 예약 및 관리'
+            : 'HomeStay Booking & Manager';
+  }, [lang]);
 
   return (
     <div className="flex min-h-screen flex-col bg-transparent text-slate-100">
@@ -36,31 +74,38 @@ const MainLayout = ({ children }) => {
               className="flex items-center gap-2 text-xl font-semibold tracking-[0.22em] text-white transition-transform duration-200 md:text-2xl"
             >
               <span className="inline-block h-2.5 w-2.5 rounded-full bg-[#c73737]" />
-              TRAVEL
+              HOMESTAY
             </Link>
             <div className="flex flex-wrap items-center justify-end gap-2 text-sm md:gap-3">
-              <select
-                value={currency}
-                onChange={(e) => setCurrency(e.target.value)}
-                className="rounded border border-white/40 bg-white/10 px-2 py-1 text-xs font-semibold text-white outline-none"
-                aria-label="Currency"
-              >
-                <option value="USD" className="text-slate-900">USD</option>
-                <option value="VND" className="text-slate-900">VND</option>
-              </select>
-              <select
-                value={lang}
-                onChange={(e) => changeLanguage(e.target.value)}
-                className="rounded border border-white/40 bg-white/10 px-2 py-1 text-xs font-semibold text-white outline-none"
-                aria-label="Language"
-              >
-                <option value="en" className="text-slate-900">
-                  {t('langEnglish')}
-                </option>
-                <option value="vi" className="text-slate-900">
-                  {t('langVietnamese')}
-                </option>
-              </select>
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setLangMenuOpen((v) => !v);
+                  }}
+                  className={`inline-flex h-9 w-9 items-center justify-center rounded-full border border-white/40 bg-white/10 text-white transition hover:border-white/60 hover:bg-white/18 ${
+                    langMenuOpen ? 'border-white/70 bg-white/20' : ''
+                  }`}
+                  aria-haspopup="menu"
+                  aria-expanded={langMenuOpen}
+                  aria-label={t('langEnglish')}
+                >
+                  <Languages className="h-4 w-4" aria-hidden />
+                </button>
+                <div
+                  onClick={(e) => e.stopPropagation()}
+                  className={`absolute right-0 top-full z-[60] mt-2 min-w-[9.5rem] rounded-lg border border-white/20 bg-[#4a5058]/95 p-1 shadow-xl backdrop-blur-md transition ${
+                    langMenuOpen ? 'visible opacity-100' : 'invisible pointer-events-none opacity-0'
+                  }`}
+                  role="menu"
+                >
+                  <button type="button" role="menuitem" onClick={() => { changeLanguage('vi'); setLangMenuOpen(false); }} className={langMenuBtn(lang === 'vi')}>🇻🇳 {t('langVietnamese')}</button>
+                  <button type="button" role="menuitem" onClick={() => { changeLanguage('en'); setLangMenuOpen(false); }} className={langMenuBtn(lang === 'en')}>🇬🇧 {t('langEnglish')}</button>
+                  <button type="button" role="menuitem" onClick={() => { changeLanguage('zh'); setLangMenuOpen(false); }} className={langMenuBtn(lang === 'zh')}>🇨🇳 {t('langChinese')}</button>
+                  <button type="button" role="menuitem" onClick={() => { changeLanguage('ko'); setLangMenuOpen(false); }} className={langMenuBtn(lang === 'ko')}>🇰🇷 {t('langKorean')}</button>
+                </div>
+              </div>
               {!user ? (
                 <>
                   <NavLink
@@ -107,15 +152,23 @@ const MainLayout = ({ children }) => {
                       className="min-w-[13.5rem] rounded-xl border border-white/20 bg-[#4a5058]/95 py-1 shadow-xl backdrop-blur-md"
                       role="menu"
                     >
-                      <NavLink to={listPropertyPath} className={accountMenuLink} role="menuitem" onClick={() => setAccountMenuOpen(false)}>
-                        {t('headerListProperty')}
-                      </NavLink>
-                      <NavLink to="/dashboard" className={accountMenuLink} role="menuitem" onClick={() => setAccountMenuOpen(false)}>
-                        {t('headerMyBookings')}
-                      </NavLink>
-                      <NavLink to="/wishlist" className={accountMenuLink} role="menuitem" onClick={() => setAccountMenuOpen(false)}>
-                        {t('headerSaved')}
-                      </NavLink>
+                      {isHostOnly ? (
+                        <NavLink to="/host" className={accountMenuLink} role="menuitem" onClick={() => setAccountMenuOpen(false)}>
+                          {t('navHost')}
+                        </NavLink>
+                      ) : (
+                        <>
+                          <NavLink to={listPropertyPath} className={accountMenuLink} role="menuitem" onClick={() => setAccountMenuOpen(false)}>
+                            {t('headerListProperty')}
+                          </NavLink>
+                          <NavLink to="/dashboard" className={accountMenuLink} role="menuitem" onClick={() => setAccountMenuOpen(false)}>
+                            {t('headerMyBookings')}
+                          </NavLink>
+                          <NavLink to="/wishlist" className={accountMenuLink} role="menuitem" onClick={() => setAccountMenuOpen(false)}>
+                            {t('headerSaved')}
+                          </NavLink>
+                        </>
+                      )}
                       <NavLink to="/account" className={accountMenuLink} role="menuitem" onClick={() => setAccountMenuOpen(false)}>
                         {t('headerAccount')}
                       </NavLink>
@@ -139,16 +192,20 @@ const MainLayout = ({ children }) => {
           </div>
           <div className="border-t border-white/25">
             <nav className="mx-auto flex max-w-7xl flex-wrap items-center gap-8 px-4 py-2">
-              <NavLink to="/" end className={navPill}>
-                {t('navStays')}
-              </NavLink>
-              <NavLink to="/search" className={navPill}>
-                {t('navSearch')}
-              </NavLink>
-              {user && (
-                <NavLink to="/dashboard" className={navPill}>
-                  {t('navTrips')}
-                </NavLink>
+              {!isHostOnly && (
+                <>
+                  <NavLink to="/" end className={navPill}>
+                    {t('navStays')}
+                  </NavLink>
+                  <NavLink to="/search" className={navPill}>
+                    {t('navSearch')}
+                  </NavLink>
+                  {user && (
+                    <NavLink to="/dashboard" className={navPill}>
+                      {t('navTrips')}
+                    </NavLink>
+                  )}
+                </>
               )}
               <div className="h-px flex-1 bg-white/45" />
               {user?.role === 'host' && (

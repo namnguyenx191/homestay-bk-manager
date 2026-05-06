@@ -1,6 +1,5 @@
 const Homestay = require('../models/Homestay');
 const Booking = require('../models/Booking');
-const { validationResult } = require('express-validator');
 
 const normalizeHomestayPayload = (body = {}) => {
   const parseList = (value) => {
@@ -41,14 +40,30 @@ const normalizeHomestayPayload = (body = {}) => {
 };
 
 const getHomestays = async (req, res) => {
-  const { location, minPrice, maxPrice, rating, amenities, roomType, sort = 'newest', q } = req.query;
+  const { location, minPrice, maxPrice, rating, amenities, roomType, sort = 'newest', q, freeCancel, ownerId } = req.query;
 
   const query = {};
   if (location) query.location = { $regex: location, $options: 'i' };
-  if (q) query.title = { $regex: q, $options: 'i' };
-  if (roomType) query.roomType = roomType;
+  if (ownerId) query.ownerId = ownerId;
+  if (q) {
+    const rx = { $regex: q, $options: 'i' };
+    query.$or = [{ title: rx }, { location: rx }, { description: rx }];
+  }
+  if (roomType) {
+    const escaped = String(roomType).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    query.roomType = { $regex: escaped, $options: 'i' };
+  }
   if (rating) query.rating = { $gte: Number(rating) };
-  if (amenities) query.amenities = { $all: amenities.split(',') };
+  if (amenities) {
+    const parts = String(amenities)
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean);
+    if (parts.length) query.amenities = { $all: parts };
+  }
+  if (String(freeCancel) === '1') {
+    query.cancellationPolicy = { $regex: /free cancellation|miễn phí|miễn phí hủy|hủy miễn phí/i };
+  }
   if (minPrice || maxPrice) {
     query.pricePerNight = {};
     if (minPrice) query.pricePerNight.$gte = Number(minPrice);
@@ -76,16 +91,12 @@ const getHomestayById = async (req, res) => {
 };
 
 const createHomestay = async (req, res) => {
-  const errors = validationResult(req);
-  if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
   const payload = { ...normalizeHomestayPayload(req.body), ownerId: req.user._id };
   const created = await Homestay.create(payload);
   res.status(201).json(created);
 };
 
 const updateHomestay = async (req, res) => {
-  const errors = validationResult(req);
-  if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
   const homestay = await Homestay.findById(req.params.id);
   if (!homestay) return res.status(404).json({ message: 'Homestay not found' });
 

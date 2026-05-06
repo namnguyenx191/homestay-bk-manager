@@ -15,7 +15,7 @@ router.get('/stats', protect, authorize('admin', 'host'), getStats);
 router.get('/revenue-report', protect, authorize('admin', 'host'), getRevenueReport);
 router.get('/users', protect, authorize('admin'), getUsers);
 router.delete('/users/:id', protect, authorize('admin'), deleteUserAccount);
-router.get('/payment-settings', protect, authorize('admin', 'host'), getPaymentSettingsAdmin);
-router.put('/payment-settings', protect, authorize('admin', 'host'), updatePaymentSettings);
+router.get('/payment-settings', protect, authorize('admin'), getPaymentSettingsAdmin);
+router.put('/payment-settings', protect, authorize('admin'), updatePaymentSettings);
 
 module.exports = router;

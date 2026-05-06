@@ -83,7 +83,7 @@ const WhyIcon = ({ type }) => {
 
 const HomePage = () => {
   const { user } = useAuth();
-  const { lang, t } = useLanguage();
+  const { lang, t, tv } = useLanguage();
   const [popular, setPopular] = useState([]);
   const [wishlistIds, setWishlistIds] = useState(() => new Set());
   const [planTab, setPlanTab] = useState(PLAN_TABS[0].id);
@@ -148,10 +148,8 @@ const HomePage = () => {
     start.setDate(start.getDate() + 1);
     const fmt = (d) =>
       d.toLocaleDateString(lang === 'vi' ? 'vi-VN' : 'en-GB', { day: 'numeric', month: 'short' });
-    return lang === 'vi'
-      ? `Ưu đãi cho kỳ lưu trú từ ${fmt(start)} – ${fmt(end)}`
-      : `Save on stays from ${fmt(start)} – ${fmt(end)}`;
-  }, [lang]);
+    return tv(`Save on stays from ${fmt(start)} – ${fmt(end)}`, `Ưu đãi cho kỳ lưu trú từ ${fmt(start)} – ${fmt(end)}`);
+  }, [lang, tv]);
 
   return (
     <div className="-mx-4">
@@ -185,10 +183,13 @@ const HomePage = () => {
             data-motion="left"
             className="mag-panel rounded-xl p-6 motion-side motion-left"
           >
-            <p className="mag-subtitle">Travel blog</p>
-            <h2 className="mag-title mt-2 text-3xl">Slow travelling</h2>
+            <p className="mag-subtitle">{tv('Travel blog', 'Cẩm nang du lịch')}</p>
+            <h2 className="mag-title mt-2 text-3xl">{tv('Slow travelling', 'Du lịch chậm')}</h2>
             <p className="mt-3 max-w-2xl text-sm text-slate-200">
-              We look to provide the most authentic routes and stays. Explore coastlines, islands and hidden local spots.
+              {tv(
+                'We look to provide the most authentic routes and stays. Explore coastlines, islands and hidden local spots.',
+                'Chúng tôi gợi ý lộ trình và nơi ở chân thực. Khám phá biển đảo và các điểm địa phương ẩn mình.'
+              )}
             </p>
             <div className="mt-5 grid gap-3 sm:grid-cols-3">
               {TRENDING.slice(0, 3).map((d) => (
@@ -203,7 +204,7 @@ const HomePage = () => {
             data-motion="right"
             className="mag-panel rounded-xl p-4 motion-side motion-right"
           >
-            <p className="mag-subtitle">Latest articles</p>
+            <p className="mag-subtitle">{tv('Latest articles', 'Bài viết mới nhất')}</p>
             <div className="mt-3 space-y-3">
               {TRENDING.slice(2, 5).map((d) => (
                 <Link key={`side-${d.name}`} to={`/search?location=${encodeURIComponent(d.name)}`} className="block rounded border border-white/10 bg-black/25 p-2">
@@ -245,15 +246,18 @@ const HomePage = () => {
           <TiltCard className="w-full" innerClassName="rounded-xl" intensity={5} shine={false}>
             <section className="flex flex-col rounded-xl border border-white/10 glass-60 p-6 shadow-sm md:flex-row md:items-center md:gap-8">
               <div className="flex-1">
-                <h2 className="text-xl font-bold text-slate-100">Travel with peace of mind</h2>
+                <h2 className="text-xl font-bold text-slate-100">{tv('Travel with peace of mind', 'Du lịch an tâm')}</h2>
                 <p className="mt-2 text-sm text-slate-300">
-                  Many homes offer flexible cancellation. Browse top-rated stays and lock in your dates early.
+                  {tv(
+                    'Many homes offer flexible cancellation. Browse top-rated stays and lock in your dates early.',
+                    'Nhiều chỗ ở hỗ trợ hủy linh hoạt. Xem các nơi được đánh giá cao và chốt lịch sớm.'
+                  )}
                 </p>
                 <Link
                   to="/search?sort=popularity"
                   className="mt-4 inline-block rounded-md bg-[#006ce4] px-5 py-2.5 text-sm font-semibold text-white shadow-md transition hover:bg-[#0057b8] hover:shadow-lg [transform:translateZ(0)]"
                 >
-                  See deals
+                  {tv('See deals', 'Xem ưu đãi')}
                 </Link>
               </div>
               <div className="mt-6 h-36 shrink-0 overflow-hidden rounded-lg bg-[#1d232b] shadow-inner md:mt-0 md:h-40 md:w-64 [transform:translateZ(12px)]">
@@ -269,11 +273,11 @@ const HomePage = () => {
 
         <div data-motion="left" className="motion-side motion-left">
           <HorizontalCarousel
-            title="Homes guests love"
-            subtitle="Highly reviewed properties with great photos and host response."
+            title={tv('Homes guests love', 'Những chỗ ở được yêu thích')}
+            subtitle={tv('Highly reviewed properties with great photos and host response.', 'Các chỗ ở có nhiều đánh giá tốt, ảnh đẹp và chủ nhà phản hồi nhanh.')}
             rightSlot={
               <Link to="/search?sort=popularity" className="text-sm font-semibold text-[#006ce4] hover:underline">
-                See more places
+                {tv('See more places', 'Xem thêm chỗ ở')}
               </Link>
             }
           >
@@ -289,8 +293,8 @@ const HomePage = () => {
         </div>
 
         <section data-motion="right" className="py-10 motion-side motion-right">
-          <h2 className="text-2xl font-bold text-slate-100 md:text-[26px]">Trending destinations</h2>
-          <p className="mt-1 text-slate-300">Explore cities travelers are viewing right now.</p>
+          <h2 className="text-2xl font-bold text-slate-100 md:text-[26px]">{tv('Trending destinations', 'Điểm đến xu hướng')}</h2>
+          <p className="mt-1 text-slate-300">{tv('Explore cities travelers are viewing right now.', 'Khám phá những thành phố đang được xem nhiều.')}</p>
           <div className="mt-6 grid grid-cols-1 gap-3 md:grid-cols-6">
             {TRENDING.map((d) => (
               <TiltCard
@@ -322,8 +326,8 @@ const HomePage = () => {
         </section>
 
         <section data-motion="left" className="py-10 motion-side motion-left">
-          <h2 className="text-2xl font-bold text-slate-100 md:text-[26px]">Plan your trip</h2>
-          <p className="mt-1 text-slate-300">Pick a vibe and discover places to match.</p>
+          <h2 className="text-2xl font-bold text-slate-100 md:text-[26px]">{tv('Plan your trip', 'Lên kế hoạch chuyến đi')}</h2>
+          <p className="mt-1 text-slate-300">{tv('Pick a vibe and discover places to match.', 'Chọn phong cách và khám phá điểm đến phù hợp.')}</p>
           <div className="mt-4 flex flex-wrap gap-2">
             {PLAN_TABS.map((tab) => (
               <button
@@ -336,7 +340,11 @@ const HomePage = () => {
                     : 'border-white/10 bg-[#20262e] text-slate-300 hover:border-slate-300'
                 }`}
               >
-                {tab.label}
+                {tab.id === 'bike'
+                  ? tv('Bike trips', 'Du lịch xe máy')
+                  : tab.id === 'food'
+                    ? tv('Food & drink', 'Ẩm thực')
+                    : tv('Photography', 'Nhiếp ảnh')}
               </button>
             ))}
           </div>
@@ -358,7 +366,7 @@ const HomePage = () => {
                       className="aspect-video w-full rounded-md object-cover shadow-inner"
                     />
                     <p className="mt-2 font-bold text-slate-100">{name}</p>
-                    <p className="text-xs text-slate-300">Homestays nearby</p>
+                    <p className="text-xs text-slate-300">{tv('Homestays nearby', 'Homestay lân cận')}</p>
                   </Link>
                 </TiltCard>
               </div>
@@ -367,7 +375,7 @@ const HomePage = () => {
         </section>
 
         <div data-motion="right" className="motion-side motion-right">
-          <HorizontalCarousel title="Weekend picks" subtitle={weekendSubtitle}>
+          <HorizontalCarousel title={tv('Weekend picks', 'Gợi ý cuối tuần')} subtitle={weekendSubtitle}>
             {popular.slice(2, 10).map((item) => (
               <PropertyListingCard
                 key={item._id}
@@ -380,7 +388,7 @@ const HomePage = () => {
         </div>
 
         <section data-motion="left" className="py-10 motion-side motion-left">
-          <h2 className="text-2xl font-bold text-slate-100 md:text-[26px]">Browse by property type</h2>
+          <h2 className="text-2xl font-bold text-slate-100 md:text-[26px]">{tv('Browse by property type', 'Khám phá theo loại chỗ ở')}</h2>
           <div className="relative mt-4">
             <div className="flex gap-4 overflow-x-auto pb-2 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
               {PROPERTY_TYPES.map((p) => (
@@ -401,7 +409,15 @@ const HomePage = () => {
                       <div className="aspect-[4/3] overflow-hidden">
                         <img src={p.img} alt="" className="h-full w-full object-cover transition duration-500 hover:scale-110" />
                       </div>
-                      <p className="p-3 text-center text-sm font-bold text-slate-100">{p.label}</p>
+                      <p className="p-3 text-center text-sm font-bold text-slate-100">
+                        {p.filter === 'Entire place'
+                          ? tv('Entire homes', 'Nhà nguyên căn')
+                          : p.filter === 'Private room'
+                            ? tv('Private rooms', 'Phòng riêng')
+                            : p.filter === 'Shared room'
+                              ? tv('Shared rooms', 'Phòng ở ghép')
+                              : tv('Unique stays', 'Chỗ ở độc đáo')}
+                      </p>
                     </Link>
                   </TiltCard>
                 </div>
@@ -413,19 +429,22 @@ const HomePage = () => {
         {!user && (
           <section data-motion="right" className="mb-10 flex flex-col items-stretch gap-6 rounded-xl border border-white/10 glass-60 p-6 motion-side motion-right md:flex-row md:items-center md:justify-between">
             <div>
-              <h2 className="text-xl font-bold text-slate-100">Travel more, stress less</h2>
+              <h2 className="text-xl font-bold text-slate-100">{tv('Travel more, stress less', 'Du lịch nhiều hơn, ít lo hơn')}</h2>
               <p className="mt-2 max-w-xl text-sm text-slate-300">
-                Sign in to save homes, message hosts from the chat bubble, and manage bookings in one place.
+                {tv(
+                  'Sign in to save homes, message hosts from the chat bubble, and manage bookings in one place.',
+                  'Đăng nhập để lưu chỗ ở, nhắn chủ nhà bằng khung chat và quản lý đặt phòng tại một nơi.'
+                )}
               </p>
               <div className="mt-4 flex flex-wrap gap-3">
                 <Link
                   to="/login"
                   className="rounded-md bg-[#006ce4] px-5 py-2.5 text-sm font-semibold text-white hover:bg-[#0057b8]"
                 >
-                  Sign in
+                  {tv('Sign in', 'Đăng nhập')}
                 </Link>
                 <Link to="/register" className="rounded-md border border-[#006ce4] px-5 py-2.5 text-sm font-semibold text-[#006ce4] hover:bg-[#20262e]">
-                  Register
+                  {tv('Register', 'Đăng ký')}
                 </Link>
               </div>
             </div>

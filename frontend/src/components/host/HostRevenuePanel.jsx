@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import toast from 'react-hot-toast';
 import client from '../../api/client';
+import { useCurrency } from '../../context/CurrencyContext';
 
 const formatYmd = (d) => {
   const x = new Date(d);
@@ -8,6 +9,7 @@ const formatYmd = (d) => {
 };
 
 const HostRevenuePanel = ({ tv, lang }) => {
+  const { formatMoney } = useCurrency();
   const [stats, setStats] = useState(null);
   const [revFrom, setRevFrom] = useState(() => {
     const d = new Date();
@@ -17,6 +19,8 @@ const HostRevenuePanel = ({ tv, lang }) => {
   const [revTo, setRevTo] = useState(() => formatYmd(new Date()));
   const [revGran, setRevGran] = useState('day');
   const [revExporting, setRevExporting] = useState(false);
+  const [liveSummary, setLiveSummary] = useState([]);
+  const [liveLoading, setLiveLoading] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -32,6 +36,29 @@ const HostRevenuePanel = ({ tv, lang }) => {
       cancelled = true;
     };
   }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    const loadLive = async () => {
+      setLiveLoading(true);
+      try {
+        const { data } = await client.get('/admin/revenue-report', {
+          params: { from: revFrom, to: revTo, granularity: revGran },
+        });
+        if (!cancelled) setLiveSummary(Array.isArray(data.summary) ? data.summary : []);
+      } catch {
+        if (!cancelled) setLiveSummary([]);
+      } finally {
+        if (!cancelled) setLiveLoading(false);
+      }
+    };
+    loadLive();
+    const timer = window.setInterval(loadLive, 15000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+    };
+  }, [revFrom, revTo, revGran]);
 
   const applyRevPreset = (preset) => {
     const to = new Date();
@@ -85,31 +112,37 @@ const HostRevenuePanel = ({ tv, lang }) => {
 
   const pendingHint =
     stats && stats.pendingRevenue
-      ? tv(`About ${Number(stats.pendingRevenue).toLocaleString()} outstanding`, `Khoảng ${Number(stats.pendingRevenue).toLocaleString()} đang chờ`)
+      ? tv(`About ${formatMoney(Number(stats.pendingRevenue))} outstanding`, `Khoảng ${formatMoney(Number(stats.pendingRevenue))} đang chờ`)
       : tv('No pending payment total', 'Không có khoản chờ thanh toán');
+  const maxLiveRevenue = Math.max(
+    1,
+    ...liveSummary.map((item) =>
+      Math.max(Number(item.roomPaidRevenue || 0), Number(item.servicePaidRevenue || 0))
+    )
+  );
 
   return (
-    <div className="space-y-6 text-white/90">
+    <div className="space-y-6 text-white">
       <h1 className="text-lg font-bold text-white">{tv('Revenue', 'Doanh thu')}</h1>
       {!stats ? (
-        <p className="text-sm text-white/60">{tv('Loading…', 'Đang tải…')}</p>
+        <p className="text-sm text-slate-200">{tv('Loading…', 'Đang tải…')}</p>
       ) : (
         <>
           <div className="grid gap-3 sm:grid-cols-3">
             <div className="rounded-xl border border-white/15 bg-white/[0.06] p-4">
-              <p className="text-xs font-medium text-white/55">{tv('Paid revenue', 'Doanh thu đã thanh toán')}</p>
-              <p className="mt-2 text-2xl font-bold text-white">${Number(stats.revenue).toLocaleString()}</p>
-              <p className="mt-1 text-[11px] text-white/50">{tv('Bookings with payment status: paid', 'Đơn có trạng thái thanh toán: paid')}</p>
+              <p className="text-xs font-medium text-slate-200">{tv('Paid revenue', 'Doanh thu đã thanh toán')}</p>
+              <p className="mt-2 text-2xl font-bold text-white">{formatMoney(Number(stats.revenue))}</p>
+              <p className="mt-1 text-[11px] text-slate-200">{tv('Bookings with payment status: paid', 'Đơn có trạng thái thanh toán: paid')}</p>
             </div>
             <div className="rounded-xl border border-white/15 bg-white/[0.06] p-4">
-              <p className="text-xs font-medium text-white/55">{tv('Awaiting payment', 'Đang chờ thanh toán')}</p>
+              <p className="text-xs font-medium text-slate-200">{tv('Awaiting payment', 'Đang chờ thanh toán')}</p>
               <p className="mt-2 text-2xl font-bold text-white">{String(stats.pendingBookings ?? 0)}</p>
-              <p className="mt-1 text-[11px] text-white/50">{pendingHint}</p>
+              <p className="mt-1 text-[11px] text-slate-200">{pendingHint}</p>
             </div>
             <div className="rounded-xl border border-white/15 bg-white/[0.06] p-4">
-              <p className="text-xs font-medium text-white/55">{tv('Live listings', 'Tin đang hiển thị')}</p>
+              <p className="text-xs font-medium text-slate-200">{tv('Live listings', 'Tin đang hiển thị')}</p>
               <p className="mt-2 text-2xl font-bold text-white">{String(stats.homestays)}</p>
-              <p className="mt-1 text-[11px] text-white/50">{tv(`${stats.bookings} bookings total`, `${stats.bookings} đơn tổng cộng`)}</p>
+              <p className="mt-1 text-[11px] text-slate-200">{tv(`${stats.bookings} bookings total`, `${stats.bookings} đơn tổng cộng`)}</p>
             </div>
           </div>
 
@@ -117,7 +150,7 @@ const HostRevenuePanel = ({ tv, lang }) => {
             <h2 className="text-base font-semibold text-white">
               {tv('Revenue report & Excel export', 'Báo cáo doanh thu — xuất Excel')}
             </h2>
-            <p className="mt-1 text-xs text-white/55">
+            <p className="mt-1 text-xs text-slate-200">
               {tv(
                 'Includes bookings whose stay overlaps the selected dates. Summary buckets use check-in date (day, week starting Monday, or month).',
                 'Gồm các đơn có kỳ lưu trú giao với khoảng ngày đã chọn. Bảng tổng hợp theo ngày nhận phòng: theo ngày, tuần (bắt đầu thứ Hai), hoặc tháng.'
@@ -141,7 +174,7 @@ const HostRevenuePanel = ({ tv, lang }) => {
               ))}
             </div>
             <div className="mt-4 flex flex-wrap items-end gap-3">
-              <label className="flex flex-col gap-1 text-xs font-medium text-white/70">
+              <label className="flex flex-col gap-1 text-xs font-medium text-slate-100">
                 {tv('From', 'Từ ngày')}
                 <input
                   type="date"
@@ -150,7 +183,7 @@ const HostRevenuePanel = ({ tv, lang }) => {
                   className="rounded-lg border border-white/20 bg-white/10 px-2 py-1.5 text-sm text-white"
                 />
               </label>
-              <label className="flex flex-col gap-1 text-xs font-medium text-white/70">
+              <label className="flex flex-col gap-1 text-xs font-medium text-slate-100">
                 {tv('To', 'Đến ngày')}
                 <input
                   type="date"
@@ -159,7 +192,7 @@ const HostRevenuePanel = ({ tv, lang }) => {
                   className="rounded-lg border border-white/20 bg-white/10 px-2 py-1.5 text-sm text-white"
                 />
               </label>
-              <label className="flex flex-col gap-1 text-xs font-medium text-white/70">
+              <label className="flex flex-col gap-1 text-xs font-medium text-slate-100">
                 {tv('Group by', 'Gom theo')}
                 <select
                   value={revGran}
@@ -187,8 +220,61 @@ const HostRevenuePanel = ({ tv, lang }) => {
               </button>
             </div>
             {revGran === 'week' ? (
-              <p className="mt-2 text-xs text-white/50">{tv('Week bucket = Monday date of that week.', 'Mỗi tuần = ngày thứ Hai đầu tuần (YYYY-MM-DD).')}</p>
+              <p className="mt-2 text-xs text-slate-200">{tv('Week bucket = Monday date of that week.', 'Mỗi tuần = ngày thứ Hai đầu tuần (YYYY-MM-DD).')}</p>
             ) : null}
+          </div>
+
+          <div className="rounded-xl border border-white/15 bg-white/[0.06] p-4 md:p-5">
+            <div className="mb-3 flex items-center justify-between">
+              <h2 className="text-base font-semibold text-white">{tv('Live revenue chart', 'Biểu đồ doanh thu live')}</h2>
+              <span className="text-xs text-slate-200">{tv('Auto refresh every 15s', 'Tự làm mới mỗi 15 giây')}</span>
+            </div>
+            {liveLoading ? (
+              <p className="text-sm text-slate-200">{tv('Loading chart…', 'Đang tải biểu đồ…')}</p>
+            ) : liveSummary.length === 0 ? (
+              <p className="text-sm text-slate-200">{tv('No data in selected range.', 'Không có dữ liệu trong khoảng đã chọn.')}</p>
+            ) : (
+              <div className="space-y-3">
+                <div className="flex items-center gap-4 text-[11px] text-slate-100">
+                  <span className="inline-flex items-center gap-1"><span className="h-2.5 w-2.5 rounded bg-sky-400" />{tv('Room revenue', 'Doanh thu phòng')}</span>
+                  <span className="inline-flex items-center gap-1"><span className="h-2.5 w-2.5 rounded bg-emerald-400" />{tv('Service revenue', 'Doanh thu dịch vụ')}</span>
+                </div>
+                <div className="overflow-x-auto rounded border border-white/10 bg-white/[0.03] p-2">
+                  <svg viewBox="0 0 980 300" className="h-[300px] min-w-[860px] w-full">
+                    <line x1="60" y1="20" x2="60" y2="250" stroke="rgba(255,255,255,0.45)" strokeWidth="1" />
+                    <line x1="60" y1="250" x2="940" y2="250" stroke="rgba(255,255,255,0.45)" strokeWidth="1" />
+                    <text x="16" y="28" fill="rgba(255,255,255,0.7)" fontSize="11">Y</text>
+                    <text x="944" y="266" fill="rgba(255,255,255,0.7)" fontSize="11">X</text>
+                    {[0, 1, 2, 3, 4].map((tick) => {
+                      const value = Math.round((maxLiveRevenue * (4 - tick)) / 4);
+                      const y = 30 + tick * 55;
+                      return (
+                        <g key={`tick-${tick}`}>
+                          <line x1="60" y1={y} x2="940" y2={y} stroke="rgba(255,255,255,0.1)" strokeWidth="1" />
+                          <text x="8" y={y + 4} fill="rgba(255,255,255,0.55)" fontSize="10">{formatMoney(value)}</text>
+                        </g>
+                      );
+                    })}
+                    {liveSummary.map((item, idx) => {
+                      const count = Math.max(1, liveSummary.length);
+                      const groupW = 860 / count;
+                      const groupX = 70 + idx * groupW;
+                      const roomRevenue = Number(item.roomPaidRevenue || 0);
+                      const serviceRevenue = Number(item.servicePaidRevenue || 0);
+                      const roomH = Math.max(0, Math.round((roomRevenue / maxLiveRevenue) * 210));
+                      const serviceH = Math.max(0, Math.round((serviceRevenue / maxLiveRevenue) * 210));
+                      return (
+                        <g key={item.periodKey}>
+                          <rect x={groupX + 8} y={250 - roomH} width={Math.max(8, groupW * 0.28)} height={roomH} fill="#38bdf8" />
+                          <rect x={groupX + 8 + Math.max(8, groupW * 0.32)} y={250 - serviceH} width={Math.max(8, groupW * 0.28)} height={serviceH} fill="#34d399" />
+                          <text x={groupX + 8} y="266" fill="rgba(255,255,255,0.72)" fontSize="10">{item.periodKey}</text>
+                        </g>
+                      );
+                    })}
+                  </svg>
+                </div>
+              </div>
+            )}
           </div>
         </>
       )}

@@ -5,6 +5,7 @@ import client from '../api/client';
 import TiltCard from '../components/motion/TiltCard';
 import { useLanguage } from '../context/LanguageContext';
 import { useAuth } from '../context/AuthContext';
+import { useCurrency } from '../context/CurrencyContext';
 import { fallbackImageByString } from '../utils/fallbackMedia';
 
 const emptyForm = {
@@ -55,6 +56,7 @@ const blankAddOn = () => ({ name: '', price: '', unit: 'item', description: '' }
 const AdminDashboardPage = () => {
   const { tv, lang } = useLanguage();
   const { user } = useAuth();
+  const { formatMoney } = useCurrency();
   const [searchParams, setSearchParams] = useSearchParams();
   const [stats, setStats] = useState(null);
   const [trending, setTrending] = useState([]);
@@ -248,7 +250,7 @@ const AdminDashboardPage = () => {
 
   const pendingHint =
     stats && stats.pendingRevenue
-      ? tv(`About ${Number(stats.pendingRevenue).toLocaleString()} outstanding`, `Khoảng ${Number(stats.pendingRevenue).toLocaleString()} đang chờ`)
+      ? tv(`About ${formatMoney(Number(stats.pendingRevenue))} outstanding`, `Khoảng ${formatMoney(Number(stats.pendingRevenue))} đang chờ`)
       : tv('No pending payment total', 'Không có khoản chờ thanh toán');
 
   const switchTab = (tabId) => {
@@ -342,7 +344,7 @@ const AdminDashboardPage = () => {
           <div className="grid gap-4 sm:grid-cols-3">
             <StatCard
               title={tv('Paid revenue', 'Doanh thu đã thanh toán')}
-              value={`$${Number(stats.revenue).toLocaleString()}`}
+              value={formatMoney(Number(stats.revenue))}
               hint={tv('Bookings with payment status: paid', 'Đơn có trạng thái thanh toán: paid')}
             />
             <StatCard
@@ -718,7 +720,7 @@ const AdminDashboardPage = () => {
               <div>
                 <p className="font-medium text-slate-900">{item.title}</p>
                 <p className="text-xs text-slate-500">
-                  {item.location} - ${item.pricePerNight}/{tv('night', 'đêm')}
+                  {item.location} - {formatMoney(item.pricePerNight)}/{tv('night', 'đêm')}
                 </p>
               </div>
               <div className="flex items-center gap-2">

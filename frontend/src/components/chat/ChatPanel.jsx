@@ -10,7 +10,7 @@ const meId = (user) => String(user?.id || user?._id || '');
 
 const tabBtn = (active) =>
   `flex-1 rounded-t-lg px-3 py-2 text-center text-xs font-semibold transition sm:text-sm ${
-    active ? 'bg-[#003580] text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+    active ? 'bg-[#003580] text-white' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
   }`;
 
 const ChatPanel = ({ variant = 'page', focusChatId = null, onFocusConsumed, onClose }) => {
@@ -101,7 +101,7 @@ const ChatPanel = ({ variant = 'page', focusChatId = null, onFocusConsumed, onCl
 
   const messagesScrollClass =
     variant === 'widget'
-      ? 'min-h-0 flex-1 space-y-2 overflow-y-auto rounded border border-slate-100 bg-slate-50/50 p-2'
+      ? 'min-h-0 flex-1 space-y-2 overflow-y-auto rounded border border-slate-200 bg-slate-50 p-2'
       : 'mb-3 h-96 space-y-2 overflow-y-auto rounded border p-2';
 
   const composer = (
@@ -110,10 +110,10 @@ const ChatPanel = ({ variant = 'page', focusChatId = null, onFocusConsumed, onCl
         value={message}
         onChange={(e) => setMessage(e.target.value)}
         placeholder={tv('Type message...', 'Nhập tin nhắn...')}
-        className="flex-1 rounded border border-slate-200 p-2 text-sm"
+        className="flex-1 rounded border border-slate-300 bg-white p-2 text-sm text-slate-900 placeholder:text-slate-500"
       />
       <button type="submit" className="rounded bg-emerald-600 px-4 py-2 text-sm text-white">
-        Send
+        {tv('Send', 'Gửi')}
       </button>
     </form>
   );
@@ -121,10 +121,10 @@ const ChatPanel = ({ variant = 'page', focusChatId = null, onFocusConsumed, onCl
   const modeTabs = (
     <div className="mb-2 flex gap-1 rounded-t-lg bg-slate-100 p-1">
       <button type="button" className={tabBtn(mode === 'ai')} onClick={() => setMode('ai')}>
-        AI assistant
+        {tv('AI assistant', 'Trợ lý AI')}
       </button>
       <button type="button" className={tabBtn(mode === 'hosts')} onClick={() => setMode('hosts')}>
-        Hosts
+        {tv('Hosts', 'Chủ nhà')}
       </button>
     </div>
   );
@@ -132,12 +132,12 @@ const ChatPanel = ({ variant = 'page', focusChatId = null, onFocusConsumed, onCl
   if (variant === 'widget') {
     return (
       <div className="flex h-full min-h-0 flex-col bg-white">
-        <div className="flex shrink-0 items-center justify-between border-b border-slate-100 px-3 py-2">
-          <span className="text-sm font-semibold text-slate-800">{tv('Messages', 'Tin nhắn')}</span>
+        <div className="flex shrink-0 items-center justify-between border-b border-slate-200 px-3 py-2">
+          <span className="text-sm font-semibold text-slate-900">{tv('Messages', 'Tin nhắn')}</span>
           <button
             type="button"
             onClick={onClose}
-            className="rounded p-1 text-slate-500 hover:bg-slate-100 hover:text-slate-800"
+            className="rounded p-1 text-slate-600 hover:bg-slate-100 hover:text-slate-900"
             aria-label={tv('Close chat', 'Đóng chat')}
           >
             <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -152,11 +152,11 @@ const ChatPanel = ({ variant = 'page', focusChatId = null, onFocusConsumed, onCl
           ) : (
             <>
               <label className="sr-only" htmlFor="chat-widget-thread">
-                Conversation
+                {tv('Conversation', 'Cuộc trò chuyện')}
               </label>
               <select
                 id="chat-widget-thread"
-                className="rounded border border-slate-200 p-2 text-sm"
+                className="rounded border border-slate-300 bg-white p-2 text-sm text-slate-900"
                 value={activeChat?._id || ''}
                 onChange={(e) => {
                   const c = chats.find((ch) => String(ch._id) === e.target.value);
@@ -171,7 +171,7 @@ const ChatPanel = ({ variant = 'page', focusChatId = null, onFocusConsumed, onCl
                 ))}
               </select>
               {!activeChat ? (
-                <p className="text-sm text-slate-500">{tv('Open a property and use "Chat with host" to start.', 'Mở một chỗ ở và bấm "Chat với chủ nhà" để bắt đầu.')}</p>
+                <p className="text-sm text-slate-700">{tv('Open a property and use "Chat with host" to start.', 'Mở một chỗ ở và bấm "Chat với chủ nhà" để bắt đầu.')}</p>
               ) : (
                 <>
                   <div className={messagesScrollClass}>
@@ -179,11 +179,13 @@ const ChatPanel = ({ variant = 'page', focusChatId = null, onFocusConsumed, onCl
                       <div
                         key={m._id}
                         className={`max-w-[85%] rounded p-2 text-sm ${
-                          String(m.senderId?._id) === meId(user) ? 'ml-auto bg-emerald-100' : 'bg-white shadow-sm'
+                          String(m.senderId?._id) === meId(user)
+                            ? 'ml-auto border border-emerald-200 bg-emerald-100'
+                            : 'border border-slate-200 bg-white shadow-sm'
                         }`}
                       >
-                        <p className="font-semibold text-xs text-slate-700">{m.senderId?.name}</p>
-                        <p className="text-slate-800">{m.content}</p>
+                        <p className="font-semibold text-xs text-slate-800">{m.senderId?.name}</p>
+                        <p className="text-slate-900">{m.content}</p>
                       </div>
                     ))}
                   </div>
@@ -206,7 +208,7 @@ const ChatPanel = ({ variant = 'page', focusChatId = null, onFocusConsumed, onCl
             AI
           </button>
           <button type="button" className={tabBtn(mode === 'hosts')} onClick={() => setMode('hosts')}>
-            Hosts
+            {tv('Hosts', 'Chủ nhà')}
           </button>
         </div>
         <div className="space-y-2">

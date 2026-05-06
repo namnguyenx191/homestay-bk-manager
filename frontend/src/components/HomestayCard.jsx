@@ -2,12 +2,13 @@ import { Link } from 'react-router-dom';
 import { useLanguage } from '../context/LanguageContext';
 import { useCurrency } from '../context/CurrencyContext';
 import { fallbackImageByString } from '../utils/fallbackMedia';
-import { getHostToneLight, hostDisplayName } from '../utils/hostDisplay';
+import { getHostToneLight, hostDisplayName, hostIdString } from '../utils/hostDisplay';
 
 const HomestayCard = ({ item }) => {
   const { tv } = useLanguage();
   const { formatMoney } = useCurrency();
   const hostName = hostDisplayName(item.ownerId);
+  const hostId = hostIdString(item.ownerId);
   const tone = getHostToneLight(item.ownerId);
   return (
   <article className="overflow-hidden rounded-xl border bg-white shadow-sm">
@@ -16,10 +17,21 @@ const HomestayCard = ({ item }) => {
       <h3 className="line-clamp-1 text-lg font-semibold">{item.title}</h3>
       {hostName ? (
         <p>
-          <span className={`inline-flex max-w-full items-center gap-1 truncate rounded-full border-2 px-2 py-0.5 text-xs font-semibold ${tone.ring} ${tone.bg} ${tone.text}`} title={hostName}>
-            <span className="shrink-0">{tv('Host', 'Chủ nhà')}</span>
-            <span className="min-w-0 truncate">{hostName}</span>
-          </span>
+          {hostId ? (
+            <Link
+              to={`/hosts/${hostId}`}
+              className={`inline-flex max-w-full items-center gap-1 truncate rounded-full border-2 px-2 py-0.5 text-xs font-semibold hover:brightness-95 ${tone.ring} ${tone.bg} ${tone.text}`}
+              title={hostName}
+            >
+              <span className="shrink-0">{tv('Host', 'Chủ nhà')}</span>
+              <span className="min-w-0 truncate">{hostName}</span>
+            </Link>
+          ) : (
+            <span className={`inline-flex max-w-full items-center gap-1 truncate rounded-full border-2 px-2 py-0.5 text-xs font-semibold ${tone.ring} ${tone.bg} ${tone.text}`} title={hostName}>
+              <span className="shrink-0">{tv('Host', 'Chủ nhà')}</span>
+              <span className="min-w-0 truncate">{hostName}</span>
+            </span>
+          )}
         </p>
       ) : null}
       <p className="text-sm text-slate-600">{item.location}</p>

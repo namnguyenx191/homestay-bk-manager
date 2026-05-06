@@ -8,11 +8,15 @@ export function resolveAssetUrl(url) {
   if (/^https?:\/\//i.test(trimmed)) return trimmed;
   const apiBase = import.meta.env.VITE_API_URL || 'http://localhost:5050/api';
   let origin;
-  try {
-    const u = new URL(apiBase);
-    origin = `${u.protocol}//${u.host}`;
-  } catch {
-    origin = String(apiBase).replace(/\/api\/?$/, '');
+  if (apiBase.startsWith('/')) {
+    origin = typeof window !== 'undefined' ? window.location.origin : 'http://localhost:5174';
+  } else {
+    try {
+      const u = new URL(apiBase);
+      origin = `${u.protocol}//${u.host}`;
+    } catch {
+      origin = String(apiBase).replace(/\/api\/?$/, '');
+    }
   }
   if (trimmed.startsWith('/')) return `${origin}${trimmed}`;
   return trimmed;

@@ -1,9 +1,9 @@
+const path = require('path');
+
 const express = require('express');
 const cors = require('cors');
 const morgan = require('morgan');
 const cookieParser = require('cookie-parser');
-const dotenv = require('dotenv');
-const path = require('path');
 
 const authRoutes = require('./routes/authRoutes');
 const homestayRoutes = require('./routes/homestayRoutes');
@@ -14,10 +14,9 @@ const uploadRoutes = require('./routes/uploadRoutes');
 const wishlistRoutes = require('./routes/wishlistRoutes');
 const chatRoutes = require('./routes/chatRoutes');
 const aiRoutes = require('./routes/aiRoutes');
+const inventoryRoutes = require('./routes/inventoryRoutes');
 const { notFound, errorHandler } = require('./middlewares/errorMiddleware');
 const { stripeWebhook } = require('./controllers/bookingController');
-
-dotenv.config();
 
 const app = express();
 
@@ -25,13 +24,17 @@ const allowedOrigins = (process.env.CLIENT_URLS || process.env.CLIENT_URL || 'ht
   .split(',')
   .map((origin) => origin.trim())
   .filter(Boolean);
-const isLocalhostOrigin = (origin) => /^https?:\/\/localhost:\d+$/.test(origin);
+const isLocalhostOrigin = (origin) =>
+  /^https?:\/\/(localhost|127\.0\.0\.1):\d+$/.test(origin);
+const isNonProd = process.env.NODE_ENV !== 'production';
 
 app.use(
   cors({
     origin: (origin, callback) => {
-      if (!origin || allowedOrigins.includes(origin) || isLocalhostOrigin(origin)) return callback(null, true);
-      return callback(new Error(`CORS blocked for origin: ${origin}`));
+      if (!origin) return callback(null, true);
+      if (isNonProd) return callback(null, origin);
+      if (allowedOrigins.includes(origin) || isLocalhostOrigin(origin)) return callback(null, true);
+      return callback(null, false);
     },
     credentials: true,
   })
@@ -58,6 +61,7 @@ app.use('/api/upload', uploadRoutes);
 app.use('/api/wishlist', wishlistRoutes);
 app.use('/api/chats', chatRoutes);
 app.use('/api/ai', aiRoutes);
+app.use('/api/inventory', inventoryRoutes);
 
 app.use(notFound);
 app.use(errorHandler);

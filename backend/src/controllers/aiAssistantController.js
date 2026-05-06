@@ -84,33 +84,6 @@ const providerError = (res, rawText, fallbackDetail, httpStatus = null) => {
   });
 };
 
-const runOpenAI = async (res, apiKey, system, messages) => {
-  const model = normalizeKey(process.env.OPENAI_MODEL) || 'gpt-4o-mini';
-  const payload = {
-    model,
-    messages: [{ role: 'system', content: system }, ...messages],
-    temperature: 0.5,
-    max_tokens: 900,
-  };
-
-  const r = await fetch('https://api.openai.com/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${apiKey}`,
-    },
-    body: JSON.stringify(payload),
-  });
-
-  const rawText = await r.text();
-  if (!r.ok) return providerError(res, rawText, undefined, r.status);
-
-  const data = JSON.parse(rawText);
-  const reply = data.choices?.[0]?.message?.content?.trim() || '';
-  if (!reply) return res.status(502).json({ message: 'Empty AI response' });
-  return res.json({ reply });
-};
-
 const extractCohereReply = (data) => {
   const msg = data && typeof data === 'object' ? data.message : null;
   if (!msg) return '';
@@ -126,15 +99,14 @@ const extractCohereReply = (data) => {
       .join('')
       .trim();
   }
+  if (c && typeof c === 'object' && typeof c.text === 'string') return c.text.trim();
   return '';
 };
 
-/** Cohere Chat API v2 — key from https://dashboard.cohere.com/ (not a Gemini key). */
-const runCohere = async (res, apiKey, system, messages) => {
+const fetchCohereReply = async (apiKey, system, messages) => {
   const model = normalizeKey(process.env.COHERE_MODEL) || 'command-r-08-2024';
   const cohereMessages = [
-    { role: 'user', content: system },
-    { role: 'assistant', content: 'Understood. I will follow these instructions and use only listing IDs from the catalog.' },
+    { role: 'system', content: system },
     ...messages.map((m) => ({
       role: m.role === 'assistant' ? 'assistant' : 'user',
       content: m.content,
@@ -157,28 +129,34 @@ const runCohere = async (res, apiKey, system, messages) => {
   });
 
   const rawText = await r.text();
-  if (!r.ok) return providerError(res, rawText, undefined, r.status);
+  if (!r.ok) {
+    console.warn('[ai] Cohere failed:', r.status, rawText.slice(0, 400));
+    return { ok: false, status: r.status, rawText };
+  }
 
   let data;
   try {
     data = JSON.parse(rawText);
   } catch {
-    return providerError(res, rawText, 'Invalid JSON from Cohere', r.status);
+    return { ok: false, status: r.status, rawText };
   }
 
   const reply = extractCohereReply(data);
   if (!reply) {
-    return res.status(502).json({ message: 'Empty AI response', detail: rawText.slice(0, 200) });
+    console.warn('[ai] Cohere empty reply:', rawText.slice(0, 300));
+    return { ok: false, status: 502, rawText };
   }
-  return res.json({ reply });
+  return { ok: true, reply };
 };
 
-const runGemini = async (res, apiKey, system, messages) => {
+const GEMINI_FALLBACK_MODELS = ['gemini-2.0-flash', 'gemini-2.0-flash-001', 'gemini-1.5-flash', 'gemini-1.5-flash-latest'];
+
+const fetchGeminiReplyOnce = async (apiKey, system, messages, modelId) => {
   let start = 0;
   while (start < messages.length && messages[start].role !== 'user') start += 1;
   const conv = messages.slice(start);
   if (!conv.length) {
-    return res.status(400).json({ message: 'No user message' });
+    return { ok: false, status: 400, rawText: 'No user message' };
   }
 
   const contents = conv.map((m) => ({
@@ -186,8 +164,7 @@ const runGemini = async (res, apiKey, system, messages) => {
     parts: [{ text: m.content }],
   }));
 
-  const model = normalizeKey(process.env.GEMINI_MODEL) || 'gemini-2.0-flash';
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(apiKey)}`;
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(modelId)}:generateContent?key=${encodeURIComponent(apiKey)}`;
 
   const body = {
     systemInstruction: { parts: [{ text: system }] },
@@ -205,28 +182,91 @@ const runGemini = async (res, apiKey, system, messages) => {
   });
 
   const rawText = await r.text();
-  if (!r.ok) return providerError(res, rawText, undefined, r.status);
+  if (!r.ok) {
+    return { ok: false, status: r.status, rawText };
+  }
 
   let data;
   try {
     data = JSON.parse(rawText);
   } catch {
-    return providerError(res, rawText, 'Invalid JSON from Gemini', r.status);
+    return { ok: false, status: 502, rawText };
   }
 
   if (data.promptFeedback?.blockReason) {
-    return res.status(502).json({
-      message: 'AI provider error',
-      detail: `Blocked: ${data.promptFeedback.blockReason}`,
-    });
+    return {
+      ok: false,
+      status: 502,
+      rawText: JSON.stringify({ blockReason: data.promptFeedback.blockReason }),
+    };
   }
 
   const parts = data.candidates?.[0]?.content?.parts;
   const reply = Array.isArray(parts) ? parts.map((p) => p.text || '').join('').trim() : '';
   if (!reply) {
-    return res.status(502).json({ message: 'Empty AI response', detail: rawText.slice(0, 200) });
+    const fr = data.candidates?.[0]?.finishReason;
+    return {
+      ok: false,
+      status: 502,
+      rawText: JSON.stringify({ finishReason: fr, snippet: rawText.slice(0, 400) }),
+    };
   }
-  return res.json({ reply });
+  return { ok: true, reply };
+};
+
+const fetchGeminiReply = async (apiKey, system, messages) => {
+  const configured = normalizeKey(process.env.GEMINI_MODEL) || 'gemini-2.0-flash';
+  const tryModels = [configured, ...GEMINI_FALLBACK_MODELS.filter((m) => m !== configured)];
+
+  let last = { ok: false, status: 502, rawText: '' };
+  for (const modelId of tryModels) {
+    last = await fetchGeminiReplyOnce(apiKey, system, messages, modelId);
+    if (last.ok) return last;
+    if (last.status !== 404) {
+      console.warn('[ai] Gemini failed:', modelId, last.status, String(last.rawText).slice(0, 400));
+      return last;
+    }
+    console.warn('[ai] Gemini model not found, retrying:', modelId);
+  }
+  return last;
+};
+
+const fetchOpenAIReply = async (apiKey, system, messages) => {
+  const model = normalizeKey(process.env.OPENAI_MODEL) || 'gpt-4o-mini';
+  const payload = {
+    model,
+    messages: [{ role: 'system', content: system }, ...messages],
+    temperature: 0.5,
+    max_tokens: 900,
+  };
+
+  const r = await fetch('https://api.openai.com/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${apiKey}`,
+    },
+    body: JSON.stringify(payload),
+  });
+
+  const rawText = await r.text();
+  if (!r.ok) {
+    console.warn('[ai] OpenAI failed:', r.status, rawText.slice(0, 400));
+    return { ok: false, status: r.status, rawText };
+  }
+
+  let data;
+  try {
+    data = JSON.parse(rawText);
+  } catch {
+    return { ok: false, status: 502, rawText };
+  }
+
+  const reply = data.choices?.[0]?.message?.content?.trim() || '';
+  if (!reply) {
+    return { ok: false, status: 502, rawText };
+  }
+  return { ok: true, reply };
 };
 
 const postAssistant = async (req, res) => {
@@ -245,36 +285,36 @@ const postAssistant = async (req, res) => {
   const system = buildSystemPrompt(JSON.stringify(catalog));
 
   const cohereKey = normalizeKey(process.env.COHERE_API_KEY);
-  if (cohereKey) {
-    try {
-      return await runCohere(res, cohereKey, system, messages);
-    } catch (err) {
-      return res.status(500).json({ message: err.message || 'AI request failed' });
-    }
-  }
-
   const geminiKey = normalizeKey(process.env.GEMINI_API_KEY || process.env.GOOGLE_AI_API_KEY);
-  if (geminiKey) {
-    try {
-      return await runGemini(res, geminiKey, system, messages);
-    } catch (err) {
-      return res.status(500).json({ message: err.message || 'AI request failed' });
-    }
-  }
-
   const openaiKey = normalizeKey(process.env.OPENAI_API_KEY);
-  if (openaiKey) {
+
+  const chain = [];
+  if (cohereKey) chain.push(['cohere', () => fetchCohereReply(cohereKey, system, messages)]);
+  if (geminiKey) chain.push(['gemini', () => fetchGeminiReply(geminiKey, system, messages)]);
+  if (openaiKey) chain.push(['openai', () => fetchOpenAIReply(openaiKey, system, messages)]);
+
+  if (!chain.length) {
+    return res.status(503).json({
+      message:
+        'AI assistant is not configured. Set COHERE_API_KEY, GEMINI_API_KEY (Google AI), or OPENAI_API_KEY in backend/.env and restart the server.',
+    });
+  }
+
+  let lastFail = { ok: false, status: 502, rawText: '' };
+  for (const [label, fn] of chain) {
     try {
-      return await runOpenAI(res, openaiKey, system, messages);
+      const out = await fn();
+      if (out.ok && out.reply) {
+        return res.json({ reply: out.reply });
+      }
+      lastFail = out;
+      console.warn('[ai] provider skipped:', label, out.ok ? 'empty' : out.status);
     } catch (err) {
-      return res.status(500).json({ message: err.message || 'AI request failed' });
+      console.warn('[ai] provider error:', label, err && err.message ? err.message : err);
     }
   }
 
-  return res.status(503).json({
-    message:
-      'AI assistant is not configured. Set COHERE_API_KEY, GEMINI_API_KEY (Google AI), or OPENAI_API_KEY in backend/.env and restart the server.',
-  });
+  return providerError(res, lastFail.rawText, undefined, lastFail.status);
 };
 
 const getAiStatus = (_req, res) => {
@@ -282,6 +322,11 @@ const getAiStatus = (_req, res) => {
   const gemini = normalizeKey(process.env.GEMINI_API_KEY || process.env.GOOGLE_AI_API_KEY);
   const openai = normalizeKey(process.env.OPENAI_API_KEY);
   const configured = Boolean(cohere || gemini || openai);
+  const providerChain = [];
+  if (cohere) providerChain.push('cohere');
+  if (gemini) providerChain.push('gemini');
+  if (openai) providerChain.push('openai');
+
   let provider = null;
   let model = '';
   if (cohere) {
@@ -294,7 +339,7 @@ const getAiStatus = (_req, res) => {
     provider = 'openai';
     model = normalizeKey(process.env.OPENAI_MODEL) || 'gpt-4o-mini';
   }
-  res.json({ configured, provider, model });
+  res.json({ configured, provider, model, providerChain });
 };
 
 module.exports = { postAssistant, getAiStatus };

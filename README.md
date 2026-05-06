@@ -8,7 +8,7 @@ Full-stack web app with role-based booking, reviews, and admin operations.
 - Backend: Node.js + Express (MVC)
 - Database: MongoDB + Mongoose
 - Auth: JWT + Role-based access control
-- Optional payment: Stripe Checkout
+- Optional payment: Stripe Checkout + Stripe Elements (inline card)
 
 ## Project Structure
 
@@ -79,8 +79,9 @@ Full-stack web app with role-based booking, reviews, and admin operations.
   - Booking confirmation email triggered after booking
   - Queue-based delivery with BullMQ + Redis (fallback to direct sending)
 - Payment
-  - Stripe session creation when `STRIPE_SECRET_KEY` is configured
-  - Graceful fallback to direct confirmation when Stripe is disabled
+  - Stripe Checkout + Stripe inline card (`PaymentIntent`) support
+  - Stripe webhook endpoint (`/api/bookings/webhook/stripe`) updates booking status server-side
+  - Optional dev fallback for local testing when Stripe keys are not configured
 
 ## REST API
 
@@ -125,7 +126,11 @@ Set required values in `backend/.env`:
 - `MONGO_URI` (MongoDB connection string)
 - `JWT_SECRET`
 - `CLIENT_URL` (default `http://localhost:5173`)
-- `STRIPE_SECRET_KEY` (optional)
+- `STRIPE_SECRET_KEY` (`sk_test_...` or `sk_live_...`)
+- `STRIPE_PUBLISHABLE_KEY` (`pk_test_...` or `pk_live_...`)
+- `STRIPE_WEBHOOK_SECRET` (`whsec_...`)
+- `STRIPE_LIVE_MODE_REQUIRED=true` in production to enforce live keys
+- `ENABLE_DEV_CARD_FALLBACK=false` for real charging mode
 - Cloudinary vars (`CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, `CLOUDINARY_API_SECRET`) for real upload
 - Redis + SMTP vars for queue email notifications (`REDIS_URL`, `SMTP_HOST`, etc.)
 
@@ -156,3 +161,22 @@ db.users.updateOne({ email: "admin@example.com" }, { $set: { role: "admin" } })
 - Wishlist and host-user chat can be implemented using additional collections and socket-based messaging.
 - Email notifications can be added via `nodemailer` + queue worker.
 - Google Maps integration can be added in detail/search pages using map SDK.
+
+## Stripe Live End-to-End Checklist
+
+1. In `backend/.env` set:
+   - `STRIPE_SECRET_KEY=sk_live_...`
+   - `STRIPE_PUBLISHABLE_KEY=pk_live_...`
+   - `STRIPE_WEBHOOK_SECRET=whsec_...`
+   - `STRIPE_LIVE_MODE_REQUIRED=true`
+   - `ENABLE_DEV_CARD_FALLBACK=false`
+2. Set frontend origin in backend env:
+   - `CLIENT_URL=https://your-frontend-domain`
+   - `CLIENT_URLS=https://your-frontend-domain`
+3. In Stripe Dashboard (Live mode), configure webhook to:
+   - `https://your-api-domain/api/bookings/webhook/stripe`
+   - Events: `payment_intent.succeeded`, `checkout.session.completed`
+4. Restart backend after env changes.
+5. Verify `/api/bookings/payment-capabilities` shows:
+   - `stripeModeMismatch: false`
+   - `stripeLiveReady: true`

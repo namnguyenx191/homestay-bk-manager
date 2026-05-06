@@ -3,7 +3,7 @@
 body {
   font-family: "Avenir Next", "Montserrat", "Segoe UI", Roboto, Arial, sans-serif;
   background-color: #1f2328;
-  color: #e7edf3;
+  color: #eef5fc;
   background-image:
     linear-gradient(rgba(9, 12, 16, 0.88), rgba(9, 12, 16, 0.88)),
     radial-gradient(circle at 20% 10%, rgba(28, 127, 167, 0.35), transparent 40%),
@@ -17,6 +17,11 @@ body {
 
 img {
   image-rendering: auto;
+}
+
+/* Tailwind/preflight can shrink OSM tiles; Leaflet needs uncapped tile images */
+.leaflet-container img {
+  max-width: none !important;
 }
 
 a {
@@ -72,6 +77,29 @@ a {
 .readable-ui .text-white\/70,
 .readable-ui .text-white\/60 {
   color: #f2f7ff !important;
+}
+
+/* Muted white-opacity utilities: bump contrast on dark UI (host hub, glass panels) */
+.readable-ui .text-white\/50,
+.readable-ui .text-white\/45,
+.readable-ui .text-white\/55 {
+  color: #d4e0ed !important;
+}
+
+.readable-ui .text-white\/65 {
+  color: #e3ecf6 !important;
+}
+
+.readable-ui .text-white\/75 {
+  color: #f0f6fc !important;
+}
+
+/* Placeholders on dark-styled inputs stay legible */
+.readable-ui input[class*="bg-white/"]::placeholder,
+.readable-ui input[class*="bg-slate-9"]::placeholder,
+.readable-ui textarea[class*="bg-slate-9"]::placeholder {
+  color: #b4c4d6 !important;
+  opacity: 1;
 }
 
 /* Ensure text is readable inside light cards/forms */

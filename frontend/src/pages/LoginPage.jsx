@@ -1,11 +1,11 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
 
 const LoginPage = () => {
-  const { login } = useAuth();
+  const { user, loading: authLoading, login } = useAuth();
   const navigate = useNavigate();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -13,13 +13,26 @@ const LoginPage = () => {
   const [errorText, setErrorText] = useState('');
   const { tv } = useLanguage();
 
+  useEffect(() => {
+    if (authLoading || !user) return;
+    if (user.role === 'host') {
+      navigate('/host', { replace: true });
+      return;
+    }
+    navigate('/', { replace: true });
+  }, [authLoading, user, navigate]);
+
   const submit = async (e) => {
     e.preventDefault();
     setLoading(true);
     setErrorText('');
     try {
-      await login({ email, password });
-      navigate('/');
+      const loggedInUser = await login({ email, password });
+      if (loggedInUser?.role === 'host') {
+        navigate('/host', { replace: true });
+      } else {
+        navigate('/', { replace: true });
+      }
     } catch (error) {
       const serverMessage = error.response?.data?.message;
       const status = error.response?.status;

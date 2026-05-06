@@ -8,9 +8,13 @@ const bookingSchema = new mongoose.Schema(
     checkOutDate: { type: Date, required: true },
     totalPrice: { type: Number, required: true },
     serviceFee: { type: Number, default: 0 },
-    paymentMethod: { type: String, enum: ['card', 'bank_transfer'], default: 'card' },
+    paymentMethod: { type: String, enum: ['card', 'bank_transfer', 'cash'], default: 'card' },
     paymentStatus: { type: String, enum: ['pending', 'paid', 'failed'], default: 'pending' },
-    status: { type: String, enum: ['pending', 'confirmed', 'cancelled'], default: 'pending' },
+    status: {
+      type: String,
+      enum: ['pending', 'confirmed', 'checked_in', 'checked_out', 'cancelled'],
+      default: 'pending',
+    },
     addOns: [
       {
         serviceName: { type: String, required: true },
@@ -32,6 +36,12 @@ const bookingSchema = new mongoose.Schema(
     stripePaymentIntentId: { type: String, default: null },
     bankTransferReference: { type: String, default: null },
     bankTransferNote: { type: String, default: null },
+    guestName: { type: String, default: '' },
+    guestPhone: { type: String, default: '' },
+    /** Paid stay, still checked_in after checkOutDate — extra nights × nightly rate */
+    overstayFeeAccrued: { type: Number, default: 0 },
+    /** Last full-day count we used for notifications / fee (avoids duplicate toasts) */
+    overstayDaysNotified: { type: Number, default: 0 },
   },
   { timestamps: true }
 );

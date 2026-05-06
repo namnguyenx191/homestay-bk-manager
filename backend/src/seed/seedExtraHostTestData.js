@@ -19,8 +19,24 @@ const fiveImageSet = [
   'https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?auto=format&fit=crop&w=1400&q=80',
 ];
 
+/** Ảnh gợi ý biển / đô thị miền biển cho listing Đà Nẵng */
+const daNangOceanImageSet = [
+  'https://images.unsplash.com/photo-1559827260-dc66d52bef19?auto=format&fit=crop&w=1400&q=80',
+  'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=1400&q=80',
+  'https://images.unsplash.com/photo-1544551763-46a013bb70d5?auto=format&fit=crop&w=1400&q=80',
+  'https://images.unsplash.com/photo-1519046904884-53103b34b206?auto=format&fit=crop&w=1400&q=80',
+  'https://images.unsplash.com/photo-1473496169904-658ba7c44d8a?auto=format&fit=crop&w=1400&q=80',
+];
+
 const host2Homes = [
-  { title: 'Host2 - Da Nang Ocean View', location: 'Da Nang', pricePerNight: 72 },
+  {
+    title: 'Host2 - Da Nang Ocean View',
+    location: 'Thanh Khê, Đà Nẵng',
+    address: '120 Đường Lê Độ, phường Thanh Khê Đông, Thanh Khê, Đà Nẵng',
+    geo: { lat: 16.071, lng: 108.186 },
+    pricePerNight: 72,
+    images: daNangOceanImageSet,
+  },
   { title: 'Host2 - Hanoi City Nest', location: 'Ha Noi', pricePerNight: 44 },
   { title: 'Host2 - Saigon Central Loft', location: 'Ho Chi Minh City', pricePerNight: 61 },
   { title: 'Host2 - Da Lat Hillside House', location: 'Da Lat', pricePerNight: 53 },
@@ -47,28 +63,31 @@ const ensureHost = async (email, name) => {
 
 const upsertSecondHostHomes = async (host) => {
   for (const [idx, item] of host2Homes.entries()) {
-    await Homestay.findOneAndUpdate(
-      { ownerId: host._id, title: item.title },
-      {
-        title: item.title,
-        description: `${item.title} - sample listing for testing host dashboard.`,
-        location: item.location,
-        address: `${100 + idx} Sample Street, ${item.location}, Vietnam`,
-        roomType: 'Entire place',
-        roomSummary: { guests: 4, bedrooms: 2, beds: 2, bathrooms: 1 },
-        pricePerNight: item.pricePerNight,
-        images: fiveImageSet,
-        amenities: ['WiFi', 'Air conditioning', 'Kitchen', 'Washer'],
-        highlights: ['Fast check-in', 'Quiet area', 'Near attractions'],
-        houseRules: ['No smoking', 'No parties'],
-        checkInWindow: '14:00 - 22:00',
-        checkOutWindow: '08:00 - 12:00',
-        cancellationPolicy: 'Free cancellation within 24 hours.',
-        rating: 4.5,
-        reviewCount: 12 + idx,
-      },
-      { upsert: true, setDefaultsOnInsert: true }
-    );
+    const payload = {
+      title: item.title,
+      description: `${item.title} - sample listing for testing host dashboard.`,
+      location: item.location,
+      address: item.address || `${100 + idx} Sample Street, ${item.location}, Vietnam`,
+      roomType: 'Entire place',
+      roomSummary: { guests: 4, bedrooms: 2, beds: 2, bathrooms: 1 },
+      pricePerNight: item.pricePerNight,
+      images: item.images && item.images.length ? item.images : fiveImageSet,
+      amenities: ['WiFi', 'Air conditioning', 'Kitchen', 'Washer'],
+      highlights: ['Fast check-in', 'Quiet area', 'Near attractions'],
+      houseRules: ['No smoking', 'No parties'],
+      checkInWindow: '14:00 - 22:00',
+      checkOutWindow: '08:00 - 12:00',
+      cancellationPolicy: 'Free cancellation within 24 hours.',
+      rating: 4.5,
+      reviewCount: 12 + idx,
+    };
+    if (item.geo && Number.isFinite(item.geo.lat) && Number.isFinite(item.geo.lng)) {
+      payload.geo = { lat: item.geo.lat, lng: item.geo.lng };
+    }
+    await Homestay.findOneAndUpdate({ ownerId: host._id, title: item.title }, payload, {
+      upsert: true,
+      setDefaultsOnInsert: true,
+    });
   }
 };
 

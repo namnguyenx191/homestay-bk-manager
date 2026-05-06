@@ -76,17 +76,17 @@ const HostBankPanel = ({ tv }) => {
   };
 
   return (
-    <div className="space-y-4 text-white/90">
+    <div className="space-y-4 text-white">
       <h1 className="text-lg font-bold text-white">{tv('Bank transfer QR (guests)', 'QR chuyển khoản (khách)')}</h1>
-      <p className="text-sm text-white/65">{tv('Shown when guests choose bank transfer at checkout.', 'Hiển thị khi khách chọn chuyển khoản ở bước thanh toán.')}</p>
+      <p className="text-sm text-slate-100">{tv('Shown when guests choose bank transfer at checkout.', 'Hiển thị khi khách chọn chuyển khoản ở bước thanh toán.')}</p>
       <div className="rounded-xl border border-white/15 bg-white/[0.06] p-4">
         <input
           type="file"
           accept="image/*"
-          className="text-sm text-white/90 file:mr-3 file:rounded-lg file:border-0 file:bg-white/15 file:px-3 file:py-1.5 file:text-sm file:font-semibold file:text-white"
+          className="text-sm text-white file:mr-3 file:rounded-lg file:border-0 file:bg-white/15 file:px-3 file:py-1.5 file:text-sm file:font-semibold file:text-white"
           onChange={(e) => e.target.files?.[0] && uploadBankQr(e.target.files[0])}
         />
-        {qrUploading ? <p className="mt-2 text-xs text-white/50">{tv('Uploading...', 'Đang tải lên...')}</p> : null}
+        {qrUploading ? <p className="mt-2 text-xs text-slate-200">{tv('Uploading...', 'Đang tải lên...')}</p> : null}
         {paymentSettings.bankQrImageUrl ? (
           <div className="mt-4 flex flex-wrap items-end gap-3">
             <img
@@ -99,7 +99,7 @@ const HostBankPanel = ({ tv }) => {
             </button>
           </div>
         ) : (
-          <p className="mt-3 text-sm text-white/50">{tv('No QR uploaded yet.', 'Chưa có ảnh QR.')}</p>
+          <p className="mt-3 text-sm text-slate-200">{tv('No QR uploaded yet.', 'Chưa có ảnh QR.')}</p>
         )}
 
         <div className="mt-4 grid gap-3 border-t border-white/10 pt-4 sm:grid-cols-2">
@@ -107,37 +107,37 @@ const HostBankPanel = ({ tv }) => {
             value={paymentSettings.bankName || ''}
             onChange={(e) => setPaymentSettings((p) => ({ ...p, bankName: e.target.value }))}
             placeholder={tv('Bank name', 'Tên ngân hàng')}
-            className="rounded-lg border border-white/20 bg-white/10 px-3 py-2 text-sm text-white placeholder:text-white/50"
+            className="rounded-lg border border-white/20 bg-white/10 px-3 py-2 text-sm text-white placeholder:text-slate-300"
           />
           <input
             value={paymentSettings.accountNumber || ''}
             onChange={(e) => setPaymentSettings((p) => ({ ...p, accountNumber: e.target.value }))}
             placeholder={tv('Account number', 'Số tài khoản')}
-            className="rounded-lg border border-white/20 bg-white/10 px-3 py-2 text-sm text-white placeholder:text-white/50"
+            className="rounded-lg border border-white/20 bg-white/10 px-3 py-2 text-sm text-white placeholder:text-slate-300"
           />
           <input
             value={paymentSettings.accountName || ''}
             onChange={(e) => setPaymentSettings((p) => ({ ...p, accountName: e.target.value }))}
             placeholder={tv('Account name', 'Tên tài khoản')}
-            className="rounded-lg border border-white/20 bg-white/10 px-3 py-2 text-sm text-white placeholder:text-white/50"
+            className="rounded-lg border border-white/20 bg-white/10 px-3 py-2 text-sm text-white placeholder:text-slate-300"
           />
           <input
             value={paymentSettings.branch || ''}
             onChange={(e) => setPaymentSettings((p) => ({ ...p, branch: e.target.value }))}
             placeholder={tv('Branch (optional)', 'Chi nhánh (tuỳ chọn)')}
-            className="rounded-lg border border-white/20 bg-white/10 px-3 py-2 text-sm text-white placeholder:text-white/50"
+            className="rounded-lg border border-white/20 bg-white/10 px-3 py-2 text-sm text-white placeholder:text-slate-300"
           />
           <input
             value={paymentSettings.swift || ''}
             onChange={(e) => setPaymentSettings((p) => ({ ...p, swift: e.target.value }))}
             placeholder="SWIFT (optional)"
-            className="rounded-lg border border-white/20 bg-white/10 px-3 py-2 text-sm text-white placeholder:text-white/50 sm:col-span-2"
+            className="rounded-lg border border-white/20 bg-white/10 px-3 py-2 text-sm text-white placeholder:text-slate-300 sm:col-span-2"
           />
           <textarea
             value={paymentSettings.instructions || ''}
             onChange={(e) => setPaymentSettings((p) => ({ ...p, instructions: e.target.value }))}
             placeholder={tv('Transfer instructions', 'Hướng dẫn chuyển khoản')}
-            className="rounded-lg border border-white/20 bg-white/10 px-3 py-2 text-sm text-white placeholder:text-white/50 sm:col-span-2"
+            className="rounded-lg border border-white/20 bg-white/10 px-3 py-2 text-sm text-white placeholder:text-slate-300 sm:col-span-2"
             rows={2}
           />
           <button

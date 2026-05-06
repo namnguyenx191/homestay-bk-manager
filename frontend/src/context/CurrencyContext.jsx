@@ -3,67 +3,39 @@ import { useLanguage } from './LanguageContext';
 
 const CurrencyContext = createContext(null);
 const STORAGE_KEY = 'travel_currency';
-const RATE_CACHE_KEY = 'travel_usd_vnd_rate';
-const RATE_CACHE_MAX_AGE_MS = 1000 * 60 * 60 * 6;
+const USD_TO_VND_RATE = 25500;
 
 export const CurrencyProvider = ({ children }) => {
   const { lang } = useLanguage();
   const [currency, setCurrency] = useState(() => {
     const saved = localStorage.getItem(STORAGE_KEY);
-    return saved === 'VND' ? 'VND' : 'USD';
-  });
-  const [usdToVndRate, setUsdToVndRate] = useState(() => {
-    const cached = Number(localStorage.getItem(RATE_CACHE_KEY));
-    return Number.isFinite(cached) && cached > 0 ? cached : 25500;
+    return saved === 'VND' ? 'VND' : 'VND';
   });
 
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEY, currency);
+    localStorage.setItem(STORAGE_KEY, 'VND');
   }, [currency]);
 
-  useEffect(() => {
-    const loadRate = async () => {
-      const ts = Number(localStorage.getItem(`${RATE_CACHE_KEY}_ts`));
-      const stillFresh = Number.isFinite(ts) && Date.now() - ts < RATE_CACHE_MAX_AGE_MS;
-      if (stillFresh) return;
-      try {
-        const res = await fetch('https://open.er-api.com/v6/latest/USD');
-        const data = await res.json();
-        const nextRate = Number(data?.rates?.VND);
-        if (Number.isFinite(nextRate) && nextRate > 0) {
-          setUsdToVndRate(nextRate);
-          localStorage.setItem(RATE_CACHE_KEY, String(nextRate));
-          localStorage.setItem(`${RATE_CACHE_KEY}_ts`, String(Date.now()));
-        }
-      } catch {
-        // Keep existing cached/default rate when offline.
-      }
-    };
-    loadRate();
-  }, []);
-
   const value = useMemo(() => {
-    const convertFromUsd = (amountUsd) => {
-      const base = Number(amountUsd || 0);
-      return currency === 'VND' ? base * usdToVndRate : base;
-    };
+    /** Hệ thống lưu giá gốc theo USD -> luôn hiển thị VND cố định. */
+    const convertFromUsd = (amountUsd) => Number(amountUsd || 0) * USD_TO_VND_RATE;
     const formatMoney = (amountUsd) => {
       const converted = convertFromUsd(amountUsd);
       const locale = lang === 'vi' ? 'vi-VN' : 'en-US';
       return new Intl.NumberFormat(locale, {
         style: 'currency',
-        currency,
-        maximumFractionDigits: currency === 'VND' ? 0 : 2,
+        currency: 'VND',
+        maximumFractionDigits: 0,
       }).format(converted);
     };
     return {
-      currency,
-      setCurrency: (next) => setCurrency(next === 'VND' ? 'VND' : 'USD'),
-      usdToVndRate,
+      currency: 'VND',
+      setCurrency: () => setCurrency('VND'),
+      usdToVndRate: USD_TO_VND_RATE,
       formatMoney,
       convertFromUsd,
     };
-  }, [currency, usdToVndRate, lang]);
+  }, [lang]);
 
   return <CurrencyContext.Provider value={value}>{children}</CurrencyContext.Provider>;
 };

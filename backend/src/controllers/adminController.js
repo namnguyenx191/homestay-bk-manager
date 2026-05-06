@@ -175,6 +175,8 @@ const getRevenueReport = async (req, res) => {
       summaryMap.set(key, {
         periodKey: key,
         paidRevenue: 0,
+        roomPaidRevenue: 0,
+        servicePaidRevenue: 0,
         pendingAmount: 0,
         bookingCount: 0,
         paidCount: 0,
@@ -182,11 +184,20 @@ const getRevenueReport = async (req, res) => {
     }
     const s = summaryMap.get(key);
     s.bookingCount += 1;
+    const totalPrice = Number(b.totalPrice) || 0;
+    const addOnsTotal = Math.max(0, Number(b.addOnsTotal) || 0);
+    const roomRevenuePart = Math.max(0, totalPrice - addOnsTotal);
+    const serviceRevenuePart = Math.max(0, Math.min(addOnsTotal, totalPrice));
     if (b.paymentStatus === 'paid') {
-      s.paidRevenue += Number(b.totalPrice) || 0;
+      s.paidRevenue += totalPrice;
+      s.roomPaidRevenue += roomRevenuePart;
+      s.servicePaidRevenue += serviceRevenuePart;
       s.paidCount += 1;
     } else {
-      s.pendingAmount += Number(b.totalPrice) || 0;
+      s.pendingAmount += totalPrice;
+      if (b.addOnPaymentStatus === 'paid' && addOnsTotal > 0) {
+        s.servicePaidRevenue += addOnsTotal;
+      }
     }
   }
 
@@ -200,8 +211,10 @@ const getRevenueReport = async (req, res) => {
     checkIn: new Date(b.checkInDate).toISOString(),
     checkOut: new Date(b.checkOutDate).toISOString(),
     totalPrice: b.totalPrice,
+    addOnsTotal: b.addOnsTotal ?? 0,
     serviceFee: b.serviceFee ?? 0,
     paymentStatus: b.paymentStatus,
+    addOnPaymentStatus: b.addOnPaymentStatus,
     bookingStatus: b.status,
     paymentMethod: b.paymentMethod,
   }));

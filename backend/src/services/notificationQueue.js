@@ -23,17 +23,45 @@ const sendBookingEmail = async ({ to, guestName, homestayTitle, checkInDate, che
   await sendEmail({ to, subject, html });
 };
 
+const sendOverstayLateEmail = async ({ to, guestName, homestayTitle, scheduledCheckOut, daysOver, feeAccrued }) => {
+  const subject = 'Late check-out notice — HomeStay Pro / Thông báo trễ trả phòng';
+  const when = new Date(scheduledCheckOut).toLocaleString('vi-VN');
+  const html = `
+    <h2>Late check-out / Trễ trả phòng</h2>
+    <p>Hi ${guestName},</p>
+    <p>Your scheduled check-out for <strong>${homestayTitle}</strong> was <strong>${when}</strong>.</p>
+    <p>You are <strong>${daysOver}</strong> day(s) past that time. An extra stay fee of <strong>${feeAccrued}</strong> (same currency as the listing) has been recorded. Please contact the host to complete check-out.</p>
+    <hr />
+    <p>Xin chào ${guestName},</p>
+    <p>Lịch trả phòng tại <strong>${homestayTitle}</strong> là <strong>${when}</strong>.</p>
+    <p>Bạn đã quá <strong>${daysOver}</strong> ngày. Phí lưu trú thêm hiện tại: <strong>${feeAccrued}</strong> (cùng đơn vị tiền với phòng). Vui lòng liên hệ chủ nhà để hoàn tất check-out.</p>
+  `;
+
+  if (notificationQueue) {
+    await notificationQueue.add('overstay-late', { to, subject, html }, { attempts: 3, removeOnComplete: true });
+    return;
+  }
+
+  await sendEmail({ to, subject, html });
+};
+
 const bootNotificationWorker = () => {
   if (!hasRedis) {
     console.log('Email queue disabled: REDIS_URL not set, using direct email sending.');
     return;
   }
 
-  createWorker(queueName, async (job) => {
-    await sendEmail(job.data);
-  });
-
-  console.log('Email queue worker started.');
+  try {
+    const w = createWorker(queueName, async (job) => {
+      await sendEmail(job.data);
+    });
+    if (w) {
+      w.on('error', (err) => console.error('[email worker]', err.message));
+    }
+    console.log('Email queue worker started.');
+  } catch (e) {
+    console.error('Email queue worker failed to start (check REDIS_URL):', e.message);
+  }
 };
 
-module.exports = { sendBookingEmail, bootNotificationWorker };
+module.exports = { sendBookingEmail, sendOverstayLateEmail, bootNotificationWorker };

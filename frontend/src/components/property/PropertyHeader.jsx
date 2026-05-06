@@ -1,12 +1,14 @@
+import { Link } from 'react-router-dom';
 import WishlistButton from '../WishlistButton';
 import { useLanguage } from '../../context/LanguageContext';
 import { useCurrency } from '../../context/CurrencyContext';
-import { getHostToneLight, hostDisplayName } from '../../utils/hostDisplay';
+import { getHostToneLight, hostDisplayName, hostIdString } from '../../utils/hostDisplay';
 
 const PropertyHeader = ({ homestay, inWishlist, onWishlistChanged }) => {
   const { tv } = useLanguage();
   const { formatMoney } = useCurrency();
   const hostName = hostDisplayName(homestay.ownerId);
+  const hostId = hostIdString(homestay.ownerId);
   const tone = getHostToneLight(homestay.ownerId);
   return (
   <section className="space-y-3 rounded-xl border bg-white p-5">
@@ -16,10 +18,17 @@ const PropertyHeader = ({ homestay, inWishlist, onWishlistChanged }) => {
         <p className="text-sm text-slate-600">{homestay.location}{homestay.address ? `, ${homestay.address}` : ''}</p>
         {hostName ? (
           <p className="mt-2">
-            <span className={`inline-flex max-w-full items-center gap-2 truncate rounded-full border-2 px-3 py-1 text-sm font-semibold ${tone.ring} ${tone.bg} ${tone.text}`}>
-              <span className="shrink-0">{tv('Host', 'Chủ nhà')}</span>
-              <span className="min-w-0 truncate">{hostName}</span>
-            </span>
+            {hostId ? (
+              <Link to={`/hosts/${hostId}`} className={`inline-flex max-w-full items-center gap-2 truncate rounded-full border-2 px-3 py-1 text-sm font-semibold hover:brightness-95 ${tone.ring} ${tone.bg} ${tone.text}`}>
+                <span className="shrink-0">{tv('Host', 'Chủ nhà')}</span>
+                <span className="min-w-0 truncate">{hostName}</span>
+              </Link>
+            ) : (
+              <span className={`inline-flex max-w-full items-center gap-2 truncate rounded-full border-2 px-3 py-1 text-sm font-semibold ${tone.ring} ${tone.bg} ${tone.text}`}>
+                <span className="shrink-0">{tv('Host', 'Chủ nhà')}</span>
+                <span className="min-w-0 truncate">{hostName}</span>
+              </span>
+            )}
           </p>
         ) : null}
       </div>

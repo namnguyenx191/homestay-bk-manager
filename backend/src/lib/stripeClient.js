@@ -16,6 +16,25 @@ const getStripePublishable = () => normalizeKey(process.env.STRIPE_PUBLISHABLE_K
 
 const getStripeWebhookSecret = () => normalizeKey(process.env.STRIPE_WEBHOOK_SECRET);
 
+const detectKeyMode = (key) => {
+  const normalized = normalizeKey(key);
+  if (!normalized) return 'none';
+  if (normalized.startsWith('sk_live_') || normalized.startsWith('pk_live_') || normalized.startsWith('whsec_live_')) return 'live';
+  if (normalized.startsWith('sk_test_') || normalized.startsWith('pk_test_') || normalized.startsWith('whsec_')) return 'test';
+  return 'unknown';
+};
+
+const getStripeSecretMode = () => detectKeyMode(getStripeSecret());
+const getStripePublishableMode = () => detectKeyMode(getStripePublishable());
+
+const isStripeModeMismatch = () => {
+  const secretMode = getStripeSecretMode();
+  const publishableMode = getStripePublishableMode();
+  if (secretMode === 'none' || publishableMode === 'none') return false;
+  if (secretMode === 'unknown' || publishableMode === 'unknown') return false;
+  return secretMode !== publishableMode;
+};
+
 /** Lazily construct Stripe client so .env is respected and keys can be trimmed. */
 const getStripe = () => {
   const secret = getStripeSecret();
@@ -35,4 +54,7 @@ module.exports = {
   getStripeSecret,
   getStripePublishable,
   getStripeWebhookSecret,
+  getStripeSecretMode,
+  getStripePublishableMode,
+  isStripeModeMismatch,
 };

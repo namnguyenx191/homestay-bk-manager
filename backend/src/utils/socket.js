@@ -3,11 +3,21 @@ const { Server } = require('socket.io');
 let io;
 
 const initSocket = (httpServer) => {
+  const origins = (process.env.CLIENT_URLS || process.env.CLIENT_URL || 'http://localhost:5173,http://localhost:5174')
+    .split(',')
+    .map((o) => o.trim())
+    .filter(Boolean);
+
+  const socketCors =
+    process.env.NODE_ENV === 'production'
+      ? { origin: origins.length ? origins : false, credentials: true }
+      : { origin: true, credentials: true };
+
   io = new Server(httpServer, {
-    cors: {
-      origin: process.env.CLIENT_URL || 'http://localhost:5173',
-      credentials: true,
-    },
+    cors: socketCors,
+    connectTimeout: 60000,
+    pingTimeout: 60000,
+    pingInterval: 25000,
   });
 
   io.on('connection', (socket) => {
@@ -17,6 +27,11 @@ const initSocket = (httpServer) => {
 
     socket.on('leave:chat', (chatId) => {
       socket.leave(chatId);
+    });
+
+    socket.on('join:user', (userId) => {
+      if (!userId) return;
+      socket.join(`user:${String(userId)}`);
     });
   });
 
@@ -28,4 +43,14 @@ const emitToChat = (chatId, event, payload) => {
   io.to(chatId).emit(event, payload);
 };
 
-module.exports = { initSocket, emitToChat };
+const emitGlobal = (event, payload) => {
+  if (!io) return;
+  io.emit(event, payload);
+};
+
+const emitToUser = (userId, event, payload) => {
+  if (!io || !userId) return;
+  io.to(`user:${String(userId)}`).emit(event, payload);
+};
+
+module.exports = { initSocket, emitToChat, emitGlobal, emitToUser };
