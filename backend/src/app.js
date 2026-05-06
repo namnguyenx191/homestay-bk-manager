@@ -20,15 +20,20 @@ const { stripeWebhook } = require('./controllers/bookingController');
 
 const app = express();
 
+const normalizeBrowserOrigin = (value) =>
+  String(value || '')
+    .trim()
+    .replace(/\/+$/, '');
+
 const allowedOrigins = [
   ...new Set([
     ...(process.env.CLIENT_URLS || process.env.CLIENT_URL || 'http://localhost:5173,http://localhost:5174')
       .split(',')
-      .map((origin) => origin.trim())
+      .map((origin) => normalizeBrowserOrigin(origin))
       .filter(Boolean),
     ...(process.env.EXTRA_CORS_ORIGINS || '')
       .split(',')
-      .map((origin) => origin.trim())
+      .map((origin) => normalizeBrowserOrigin(origin))
       .filter(Boolean),
   ]),
 ];
@@ -41,7 +46,13 @@ app.use(
     origin: (origin, callback) => {
       if (!origin) return callback(null, true);
       if (isNonProd) return callback(null, origin);
-      if (allowedOrigins.includes(origin) || isLocalhostOrigin(origin)) return callback(null, true);
+      const reqOrigin = normalizeBrowserOrigin(origin);
+      if (
+        allowedOrigins.some((allowed) => normalizeBrowserOrigin(allowed) === reqOrigin) ||
+        isLocalhostOrigin(origin)
+      ) {
+        return callback(null, true);
+      }
       return callback(null, false);
     },
     credentials: true,
